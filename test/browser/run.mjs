@@ -517,6 +517,38 @@ await page.waitForTimeout(300);
 await page.fill('#search', '');
 
 // ---------------------------------------------------------------------------
+section('Stale build notice');
+
+ck('no notice while the build is unchanged',
+  await page.locator('#stale').evaluate((e) => e.classList.contains('hidden')));
+ck('the build is stamped on API responses', await page.evaluate(async () => {
+  const r = await fetch('/api/activity');
+  return !!r.headers.get('X-LogGen-Version');
+}));
+
+// Drive the client half directly. Restarting the server mid-suite is not
+// something this runner can do, and the part worth pinning is that a changed
+// build raises the notice while a repeat of the same one does not.
+ck('the same build again raises nothing', await page.evaluate(() => {
+  noteBuild(state.build);
+  return document.getElementById('stale').classList.contains('hidden');
+}));
+ck('a different build raises the notice', await page.evaluate(() => {
+  noteBuild('v0.0.0-not-the-running-build');
+  return !document.getElementById('stale').classList.contains('hidden');
+}));
+ck('the notice offers a reload',
+  (await page.locator('#staleReload').count()) === 1);
+ck('the notice does not cover the app', await page.evaluate(() => {
+  const s = document.getElementById('stale').getBoundingClientRect();
+  const t = document.querySelector('.targetbar').getBoundingClientRect();
+  return s.bottom <= t.top + 1;
+}));
+
+// Put it back so the sections after this see an ordinary page.
+await page.evaluate(() => document.getElementById('stale').classList.add('hidden'));
+
+// ---------------------------------------------------------------------------
 section('Form alignment');
 
 await page.click('[data-view=admin]');

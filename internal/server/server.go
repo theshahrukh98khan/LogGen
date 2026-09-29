@@ -74,7 +74,24 @@ func (s *Server) Handler() http.Handler {
 
 	mux.Handle("/", noStore(http.FileServer(http.FS(s.web))))
 
-	return logRequests(mux)
+	return logRequests(s.stamp(mux))
+}
+
+// stamp names the build serving each response.
+//
+// no-store keeps a browser from caching the console, but nothing tells a page
+// that is already open that the binary underneath it has been replaced. During
+// development that is most of the time: the operator rebuilds, looks at a tab
+// that has been open for an hour, and sees the previous build's markup and
+// stylesheet with no hint that anything is stale. The console watches this
+// header and offers a reload when it changes.
+func (s *Server) stamp(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.Version != "" {
+			w.Header().Set("X-LogGen-Version", s.Version)
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // noStore stops browsers caching the console.

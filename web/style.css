@@ -1100,3 +1100,23 @@ input:focus, select:focus, textarea:focus {
   margin-top: 20px;
   flex-wrap: wrap;
 }
+
+
+/* ---------------------------------------------------------------------------
+   Stale build notice
+   In normal flow rather than floating, so it cannot cover anything and cannot
+   be missed on a page that is showing the wrong markup.
+   --------------------------------------------------------------------------- */
+
+.stale {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 9px 18px;
+  background: rgba(255, 176, 32, .1);
+  border-bottom: 1px solid var(--signal-deep);
+  color: var(--signal);
+  font-size: 12.5px;
+}
+.stale span { flex: 1 1 260px; }
