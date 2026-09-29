@@ -318,3 +318,23 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
 }
 .toast.ok { border-left-color: var(--ok); }
 .toast.bad { border-left-color: var(--bad); }
+
+/* ---------- credit ---------- */
+
+.credit {
+  padding: 4px 20px 26px;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.credit a {
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.credit a:hover {
+  color: var(--text);
+  border-bottom-color: var(--line);
+}

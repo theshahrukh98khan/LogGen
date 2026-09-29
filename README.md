@@ -425,6 +425,13 @@ fields, that the Windows JSON envelope parses, and that a value appearing in a
 Windows record's description also appears in its structured fields — a
 generator called twice would silently break any rule correlating the two.
 
+## Author
+
+Built by **Shahrukh Khan**.
+
+- Website — [heyshahrukh.me](https://www.heyshahrukh.me)
+- LinkedIn — [Shahrukh98khan](https://www.linkedin.com/in/shahrukh98khan)
+
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) © Shahrukh Khan
