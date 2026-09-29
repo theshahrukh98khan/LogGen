@@ -4,9 +4,12 @@ package sender
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/theshahrukh98khan/LogGen/internal/core"
@@ -193,6 +196,50 @@ func Probe(pr core.Profile) error {
 		return err
 	}
 	return c.Close()
+}
+
+// Failure classifies why a connection could not be made.
+//
+// A refusal and a timeout look the same in the UI but need opposite fixes. A
+// refusal means the packet arrived and the host had nothing bound to that
+// port, so the collector is not configured or not running. A timeout means
+// nothing came back at all, so something in between is dropping it. Telling
+// somebody to open a firewall when their SIEM simply is not listening on that
+// port sends them to the wrong machine entirely.
+type Failure string
+
+const (
+	// FailRefused is a host that answered with a reset.
+	FailRefused Failure = "refused"
+	// FailTimeout is a connection attempt that got no answer at all.
+	FailTimeout Failure = "timeout"
+	// FailOther is anything else, including local socket errors.
+	FailOther Failure = "other"
+)
+
+// Classify inspects a dial error. It is only meaningful for TCP: a UDP socket
+// opens whether or not anything is at the other end.
+func Classify(err error) Failure {
+	if err == nil {
+		return FailOther
+	}
+	var ne net.Error
+	if errors.As(err, &ne) && ne.Timeout() {
+		return FailTimeout
+	}
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, os.ErrDeadlineExceeded) {
+		return FailTimeout
+	}
+	if errors.Is(err, syscall.ECONNREFUSED) {
+		return FailRefused
+	}
+	// Windows reports a refusal as WSAECONNREFUSED. Go maps it through
+	// Errno.Is, but a wrapped or stringified error can still slip past, so the
+	// text is checked as a fallback rather than relied on.
+	if strings.Contains(strings.ToLower(err.Error()), "refused") {
+		return FailRefused
+	}
+	return FailOther
 }
 
 // ---------------------------------------------------------------------------

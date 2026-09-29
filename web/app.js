@@ -157,7 +157,7 @@ async function checkTarget() {
       note.textContent = res.error || 'The destination name does not resolve.';
     } else {
       text.textContent = 'Unreachable';
-      note.textContent = 'Nothing is listening. Check the host, port and firewall.';
+      note.textContent = connectAdvice(res, p);
     }
     return;
   }
@@ -179,6 +179,35 @@ async function checkTarget() {
     text.textContent = 'Connected';
     note.textContent = resolvedTo.trim();
   }
+}
+
+
+// connectAdvice explains a failed connection in terms of what did work.
+//
+// Saying only "nothing is listening" next to a host that answers a ping reads
+// like a contradiction, and the usual conclusion is that the tool is broken.
+// The name resolving is proof the destination is right, so it is reported
+// first, and a refusal is separated from a timeout because they are faults on
+// different machines.
+function connectAdvice(res, profile) {
+  const r = res.resolved;
+  const where = (r && !r.isIp && r.addrs && r.addrs.length)
+    ? `${r.host} resolves to ${r.addrs.join(', ')}, but `
+    : '';
+  const port = profile ? `port ${profile.port}` : 'that port';
+
+  if (res.reason === 'refused') {
+    // A refusal proves packets arrive, but across NAT the router may be the
+    // one refusing, so both ends are worth naming.
+    return `${where}the connection to ${port} was refused. Packets reach it, so ` +
+      `nothing is bound there: enable the SIEM's syslog input, or add a port ` +
+      `forward if it sits behind NAT.`;
+  }
+  if (res.reason === 'timeout') {
+    return `${where}nothing answered on ${port} before the timeout. Something in ` +
+      `between is dropping it: check a firewall or port forward.`;
+  }
+  return `${where}the connection to ${port} failed. ${res.error || ''}`.trim();
 }
 
 // ---------------------------------------------------------------------------

@@ -253,6 +253,7 @@ func (s *Server) handleTestProfile(w http.ResponseWriter, r *http.Request) {
 			"stage":    "connect",
 			"target":   target,
 			"resolved": res,
+			"reason":   string(sender.Classify(err)),
 			"error":    err.Error(),
 		})
 		return
