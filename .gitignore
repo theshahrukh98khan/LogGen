@@ -1,0 +1,11 @@
+# build output
+logsource
+logsource.exe
+*.exe
+
+# runtime config, machine specific
+data/
+
+# scratch from local testing
+*.out
+*.err
