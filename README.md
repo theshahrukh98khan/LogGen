@@ -62,6 +62,10 @@ go build -o loggen .
 ./loggen
 ```
 
+This repository is private, so cloning needs credentials — a personal access
+token over HTTPS, or an SSH key with
+`git@github.com:theshahrukh98khan/LogGen.git`.
+
 The console binds to all interfaces on port 8088 and prints every URL it is
 reachable on:
 
@@ -284,13 +288,14 @@ LogGen writes synthetic log records to a SIEM you control, for validating parser
 and detection logic in a lab you own. It is not an attack tool and performs no
 real activity on any host.
 
-## Contributing
+## Adding to it
 
-New controls are the most useful contribution — a source that is missing, or an
+New controls are the most useful thing to add — a source that is missing, or an
 event ID that matters for a detection you are writing. Keep the message structure
 faithful to what the real source emits; a control that is nearly right is worse
 than none, because it teaches a rule to match something that will never occur.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). The repository is private, so nothing is distributed yet; the
+licence applies if and when it is shared.
