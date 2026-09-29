@@ -132,8 +132,12 @@ jobs:
           pid=$!
           for i in $(seq 1 30); do
             sleep 0.3
-            if curl -sf http://127.0.0.1:8099/api/controls -o controls.json; then break; fi
+            if curl -sf http://127.0.0.1:8099/api/auth/state -o /dev/null; then break; fi
           done
+          # The catalog is behind the sign-in now. A fresh data directory is
+          # always admin/admin.
+          curl -sf -c jar.txt -X POST http://127.0.0.1:8099/api/auth/login             -H 'Content-Type: application/json'             -d '{"user":"admin","password":"admin"}' -o /dev/null
+          curl -sf -b jar.txt http://127.0.0.1:8099/api/controls -o controls.json
           kill $pid
           count=$(grep -o '"id":' controls.json | wc -l)
           echo "controls registered: $count"
