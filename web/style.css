@@ -115,7 +115,18 @@ p { margin: 0; }
   flex-wrap: wrap;
 }
 
-.brand { display: flex; align-items: center; gap: 11px; }
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  color: inherit;
+  text-decoration: none;
+  border-radius: 8px;
+  padding: 2px 4px;
+  margin-left: -4px;
+}
+.brand:hover h1 { color: var(--signal); }
+.brand:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
 
 .logo {
   display: grid;
@@ -1058,4 +1069,41 @@ input:focus, select:focus, textarea:focus {
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+
+/* ---------------------------------------------------------------------------
+   Modal
+   Used for the unsaved-changes prompt. It covers the app rather than sitting
+   inside a panel, because the question is about leaving that panel.
+   --------------------------------------------------------------------------- */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(3, 5, 9, .72);
+}
+
+.modal-box {
+  width: min(460px, 100%);
+  padding: 22px 24px 20px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .55);
+}
+.modal-box h3 { font-family: var(--mono); font-size: 15px; letter-spacing: -.01em; }
+.modal-box .hint { margin-top: 8px; }
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+  flex-wrap: wrap;
 }

@@ -152,6 +152,88 @@ await page.waitForTimeout(350);
 ck('Send returns to the workspace', await page.locator('#simView').isVisible());
 
 // ---------------------------------------------------------------------------
+section('Home link and unsaved changes');
+
+// The mark is the way back to the workspace from anywhere.
+await page.click('[data-view=admin]');
+await page.waitForTimeout(300);
+await page.click('#brandHome');
+await page.waitForTimeout(350);
+ck('the logo returns to Send', await page.locator('#simView').isVisible());
+ck('the logo does not leave a hash behind', !page.url().endsWith('#'),
+  page.url());
+
+// An untouched form navigates away without a word.
+await page.click('[data-view=admin]');
+await page.waitForTimeout(300);
+await page.click('[data-admin=estate]');
+await page.waitForTimeout(300);
+await page.click('#adminBack');
+await page.waitForTimeout(300);
+ck('a clean form leaves without asking',
+  (await page.locator('#adminHub').isVisible()) &&
+  !(await page.locator('#leaveGuard').isVisible()));
+
+// A touched one does not.
+await page.click('[data-admin=estate]');
+await page.waitForTimeout(300);
+const realDomain = await page.inputValue('#ev_domain');
+await page.fill('#ev_domain', 'unsaved-edit.example');
+await page.click('#brandHome');
+await page.waitForTimeout(300);
+ck('leaving a dirty form asks first', await page.locator('#leaveGuard').isVisible());
+ck('it is still on the form behind the prompt', await page.locator('#adminEstate').isVisible());
+
+// Keep editing stays put and keeps the edit.
+await page.click('#leaveCancel');
+await page.waitForTimeout(300);
+ck('keep editing stays on the form',
+  (await page.locator('#adminEstate').isVisible()) &&
+  !(await page.locator('#leaveGuard').isVisible()));
+ck('keep editing does not undo the edit',
+  (await page.inputValue('#ev_domain')) === 'unsaved-edit.example');
+
+// Discard drops the edit and leaves.
+await page.click('#brandHome');
+await page.waitForTimeout(300);
+await page.click('#leaveDiscard');
+await page.waitForTimeout(400);
+ck('discard leaves the panel', await page.locator('#simView').isVisible());
+await page.click('[data-view=admin]');
+await page.waitForTimeout(300);
+await page.click('[data-admin=estate]');
+await page.waitForTimeout(400);
+ck('discard did not save the edit',
+  (await page.inputValue('#ev_domain')) === realDomain,
+  await page.inputValue('#ev_domain'));
+
+// Save writes it, then leaves. Put the real value back afterwards so the rest
+// of the suite sees the estate it expects.
+await page.fill('#ev_domain', 'guard-test.example');
+await page.click('#adminBack');
+await page.waitForTimeout(300);
+await page.click('#leaveSave');
+await page.waitForTimeout(700);
+ck('save leaves the panel once it has written',
+  (await page.locator('#adminHub').isVisible()) &&
+  !(await page.locator('#leaveGuard').isVisible()));
+const saved = await (await fetch(`${BASE}/api/state`)).json();
+ck('save actually persisted the edit', saved.env.domain === 'guard-test.example',
+  saved.env.domain);
+
+await page.click('[data-admin=estate]');
+await page.waitForTimeout(300);
+await page.fill('#ev_domain', realDomain);
+await page.click('#envForm button[type=submit]');
+await page.waitForTimeout(500);
+ck('the estate is back as it was',
+  (await (await fetch(`${BASE}/api/state`)).json()).env.domain === realDomain);
+await page.click('#adminBack');
+await page.waitForTimeout(300);
+await page.click('[data-view=send]');
+await page.waitForTimeout(300);
+
+// ---------------------------------------------------------------------------
 section('Filtering');
 
 const sources = await page.locator('#sourceTabs .tab span:first-child').allTextContents();

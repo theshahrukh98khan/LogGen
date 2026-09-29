@@ -168,10 +168,10 @@ function renderCustomList() {
         '<button class="btn ghost small danger" data-act="delete">Delete</button>' +
       '</div>';
 
-    row.querySelector('[data-act=edit]').onclick = () => {
+    row.querySelector('[data-act=edit]').onclick = () => guard(() => {
       fillCustomForm(c);
       $('cc_source').scrollIntoView({ behavior: 'smooth', block: 'center' });
-    };
+    });
     row.querySelector('[data-act=delete]').onclick = async () => {
       if (!confirm('Delete custom control "' + c.name + '"?')) return;
       try {
@@ -240,6 +240,7 @@ function fillCustomForm(c) {
   ((c && c.params) || []).forEach((p) => box.appendChild(paramRow(p)));
 
   $('cc_wire').classList.add('hidden');
+  markClean('customForm');
 }
 
 function readCustomForm() {
@@ -279,17 +280,24 @@ async function reloadCatalog() {
 // Wiring
 // ---------------------------------------------------------------------------
 
+// Everything that leaves an editable panel goes through guard(), which asks
+// before unsaved edits are thrown away.
 document.querySelectorAll('#mainNav .nav-item').forEach((b) => {
-  b.onclick = () => showView(b.dataset.view);
+  b.onclick = () => guard(() => showView(b.dataset.view));
 });
 
-$('btnCloseAdmin').onclick = () => showView('send');
+$('brandHome').onclick = (e) => {
+  e.preventDefault();
+  guard(() => showView('send'));
+};
+
+$('btnCloseAdmin').onclick = () => guard(() => showView('send'));
 
 document.querySelectorAll('#adminHub .tile').forEach((b) => {
   b.onclick = () => showAdminTab(b.dataset.admin);
 });
 
-$('adminBack').onclick = () => showAdminTab('hub');
+$('adminBack').onclick = () => guard(() => showAdminTab('hub'));
 
 // ---------------------------------------------------------------------------
 // Keyboard
@@ -304,9 +312,11 @@ document.addEventListener('keydown', (e) => {
   // "/" jumps to search from anywhere.
   if (e.key === '/' && !typing) {
     e.preventDefault();
-    showView('send');
-    $('search').focus();
-    $('search').select();
+    guard(() => {
+      showView('send');
+      $('search').focus();
+      $('search').select();
+    });
     return;
   }
 
@@ -318,7 +328,9 @@ document.addEventListener('keydown', (e) => {
     // Inside an administration panel, Escape steps back to the hub rather than
     // out of administration altogether, so one key does not lose two levels.
     if (state.view === 'admin' && state.adminTab !== 'hub') {
-      showAdminTab('hub');
+      // Escape out of a panel is navigation like any other, so it asks too.
+      // The guard dialog handles its own Escape before this ever runs.
+      guard(() => showAdminTab('hub'));
       return;
     }
     if (document.activeElement === $('search')) {
@@ -352,7 +364,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 $('cc_addParam').onclick = () => $('cc_params').appendChild(paramRow());
-$('cc_reset').onclick = () => fillCustomForm(null);
+$('cc_reset').onclick = () => guard(() => fillCustomForm(null));
 
 $('cc_preview').onclick = async () => {
   const body = readCustomForm();

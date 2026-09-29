@@ -10,10 +10,10 @@
 <body>
 
 <header class="topbar">
-  <div class="brand">
+  <a class="brand" id="brandHome" href="#" title="Back to Send">
     <span class="logo">LG</span>
     <h1>LogGen</h1>
-  </div>
+  </a>
 
   <nav class="nav" id="mainNav">
     <button class="nav-item active" data-view="send">Send</button>
@@ -400,6 +400,21 @@
   · <a href="https://www.linkedin.com/in/shahrukh98khan" target="_blank" rel="noopener noreferrer">LinkedIn</a>
   · <a href="https://github.com/theshahrukh98khan/LogGen" target="_blank" rel="noopener noreferrer">Source</a>
 </footer>
+
+<!-- Asked before navigation throws away edits. Three answers, so it cannot be
+     a native confirm(), which only offers two. -->
+<div id="leaveGuard" class="modal hidden" role="dialog" aria-modal="true"
+     aria-labelledby="leaveTitle" aria-describedby="leaveBody">
+  <div class="modal-box">
+    <h3 id="leaveTitle">Unsaved changes</h3>
+    <p id="leaveBody" class="hint"></p>
+    <div class="modal-actions">
+      <button id="leaveCancel" class="btn">Keep editing</button>
+      <button id="leaveDiscard" class="btn">Discard</button>
+      <button id="leaveSave" class="btn primary">Save</button>
+    </div>
+  </div>
+</div>
 
 <div id="toast" class="toast hidden"></div>
 
