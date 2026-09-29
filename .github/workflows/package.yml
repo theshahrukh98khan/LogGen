@@ -45,11 +45,22 @@ jobs:
           set -euo pipefail
           docker run -d --name loggen-test -p 127.0.0.1:8099:8088 loggen:smoketest
 
-          # Wait for the console to answer.
+          # Wait for the console to answer. The sign-in endpoint is the one
+          # that responds without a session.
           for i in $(seq 1 30); do
             sleep 1
-            if curl -sf http://127.0.0.1:8099/api/controls -o controls.json; then break; fi
+            if curl -sf http://127.0.0.1:8099/api/auth/state -o /dev/null; then break; fi
           done
+
+          # The image must ship the sign-in, and it must actually refuse a
+          # caller without one. A container that served the catalog to anyone
+          # who could reach the port would be a serious regression.
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8099/api/controls)
+          echo "unauthenticated /api/controls: ${code}"
+          test "${code}" = "401"
+
+          curl -sf -c jar.txt -X POST http://127.0.0.1:8099/api/auth/login             -H 'Content-Type: application/json'             -d '{"user":"admin","password":"admin"}' -o /dev/null
+          curl -sf -b jar.txt http://127.0.0.1:8099/api/controls -o controls.json
 
           count=$(python3 -c "import json;print(len(json.load(open('controls.json'))))")
           echo "controls served by the image: $count"
