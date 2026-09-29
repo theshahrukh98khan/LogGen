@@ -296,7 +296,7 @@ the top bar.
 
 | Field | Notes |
 |---|---|
-| **Host / Port** | Where records go. Wazuh's syslog listener is normally 514. |
+| **Host / Port** | Where records go, as a **host name or an IP address** — `wazuh.corp.local` works as well as `10.20.30.5`. Wazuh's syslog listener is normally 514. |
 | **Protocol** | `udp` or `tcp`. |
 | **Syslog format** | `rfc3164` (classic BSD, what most collectors expect), `rfc5424` (structured), or `raw` (no header). |
 | **TCP framing** | `lf` (newline delimited, RFC 6587 non-transparent) or `octet` (length prefix). Ignored for UDP. |

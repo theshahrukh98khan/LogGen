@@ -148,19 +148,34 @@ async function checkTarget() {
 
   if (!res.ok) {
     bar.className = 'targetbar bad';
-    text.textContent = 'Unreachable';
-    note.textContent = 'Nothing is listening. Check the host, port and firewall.';
+    // A name that does not resolve and a port nothing answers on need
+    // different fixes, so they get different advice.
+    if (res.stage === 'resolve') {
+      text.textContent = 'Name not found';
+      note.textContent = res.error || 'The destination name does not resolve.';
+    } else {
+      text.textContent = 'Unreachable';
+      note.textContent = 'Nothing is listening. Check the host, port and firewall.';
+    }
     return;
   }
+
+  // With a named destination, show what it resolved to: a stale DNS record is
+  // invisible otherwise.
+  const r = res.resolved;
+  const resolvedTo = (r && !r.isIp && r.addrs && r.addrs.length)
+    ? ` ${r.host} resolves to ${r.addrs.join(', ')}.`
+    : '';
 
   if (p.protocol === 'udp') {
     bar.className = 'targetbar unverified';
     text.textContent = 'Ready';
-    note.textContent = 'UDP delivery is not confirmed by sending. Verify a record arrived at the collector.';
+    note.textContent =
+      'UDP delivery is not confirmed by sending. Verify a record arrived at the collector.' + resolvedTo;
   } else {
     bar.className = 'targetbar good';
     text.textContent = 'Connected';
-    note.textContent = '';
+    note.textContent = resolvedTo.trim();
   }
 }
 

@@ -213,18 +213,42 @@ func (s *Server) handleSetDefault(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.st.Profiles())
 }
 
-// handleTestProfile opens a connection to the target without sending a record.
+// handleTestProfile checks a destination without sending a record.
+//
+// Resolution is checked before dialling, because a name that does not resolve
+// and a port nothing is listening on are different problems with different
+// fixes, and telling somebody to check their firewall when DNS is the fault
+// sends them the wrong way.
 func (s *Server) handleTestProfile(w http.ResponseWriter, r *http.Request) {
 	p, err := s.st.Profile(r.PathValue("id"))
 	if err != nil {
 		writeStoreErr(w, err)
 		return
 	}
+
+	target := p.Protocol + "://" + p.Addr()
+	res := sender.Resolve(p)
+
+	if res.Failed {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok":       false,
+			"stage":    "resolve",
+			"target":   target,
+			"resolved": res,
+			"error": fmt.Sprintf("%q does not resolve. Check the name, or use an IP address.",
+				res.Host),
+			"detail": res.Message,
+		})
+		return
+	}
+
 	if err := sender.Probe(p); err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{
-			"ok":     false,
-			"target": p.Protocol + "://" + p.Addr(),
-			"error":  err.Error(),
+			"ok":       false,
+			"stage":    "connect",
+			"target":   target,
+			"resolved": res,
+			"error":    err.Error(),
 		})
 		return
 	}
@@ -233,10 +257,18 @@ func (s *Server) handleTestProfile(w http.ResponseWriter, r *http.Request) {
 	if p.Protocol == core.ProtoUDP {
 		note = "Socket opened. UDP is connectionless, so this does not prove the SIEM is listening — send a heartbeat and confirm it arrives."
 	}
+	// With a named destination, say what it resolved to: a stale record or an
+	// unexpected address is invisible otherwise.
+	if !res.IsIP && len(res.Addrs) > 0 {
+		note += " " + res.Host + " resolves to " + strings.Join(res.Addrs, ", ") + "."
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":     true,
-		"target": p.Protocol + "://" + p.Addr(),
-		"note":   note,
+		"ok":       true,
+		"stage":    "connect",
+		"target":   target,
+		"resolved": res,
+		"note":     note,
 	})
 }
 
