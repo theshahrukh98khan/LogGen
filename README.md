@@ -4,18 +4,24 @@ A log simulation lab for **Wazuh log onboarding and detection-rule testing** at 
 
 It generates correctly structured records for common log sources and ships them to a SIEM over syslog, so decoders, field extraction and detection rules can be exercised without a real estate behind them. Click a control, one record goes out.
 
-## Status
+## Controls
 
-| Piece | State |
-|---|---|
-| SIEM profiles (host / port / TCP / UDP / format) | Done |
-| Syslog sender (RFC 3164, RFC 5424, raw) | Done |
-| Operator console + activity feed | Done |
-| Local syslog sink for testing | Done |
-| Windows log source | Not started |
-| Linux log source | Not started |
-| Nginx log source | Not started |
-| Apache log source | Not started |
+96 controls across four sources, each reproducing the real message structure so
+Wazuh's stock decoders extract the same fields they would from a live host.
+
+| Source | Count | Covers |
+|---|---|---|
+| **Windows** | 30 | Logon success/failure, Kerberos (TGT, kerberoasting, pre-auth), account and group management, process creation, PowerShell script blocks, service and scheduled task creation, registry Run keys, Defender detections, log clearing, audit policy changes, share access |
+| **Linux** | 25 | SSH (password, key, invalid user, max retries), PAM, sudo and su, useradd/userdel/groupadd/usermod, cron and crontab, systemd units, auditd execve and SUID creation, firewall drops, history tampering |
+| **Nginx** | 20 | 16 access-log cases + 4 error-log cases |
+| **Apache** | 20 | the same 16 access cases + 4 error cases in Apache's formats |
+
+Web cases cover normal traffic, 401/403/404/500, SQL injection, XSS, path
+traversal, command injection, Log4Shell, web shells, scanner user agents,
+Shellshock, login brute force and large uploads. Nginx and Apache share one case
+table, so the access-log structure is identical between them and only the syslog
+tag and error-log format differ — which is exactly the difference a parser has to
+cope with in production.
 
 ## Requirements
 
@@ -29,13 +35,25 @@ go build -o logsource.exe .
 .\logsource.exe
 ```
 
-The console opens at <http://127.0.0.1:8088>.
+The console binds to all interfaces on port 8088, so it can be opened from any
+machine on the lab network. On startup it prints every URL it is reachable on:
+
+```
+LogSource console reachable at:
+    http://127.0.0.1:8088  (this machine)
+    http://10.20.30.15:8088  (network)
+```
+
+**The console has no authentication and can send syslog traffic to any host you
+point it at.** Keep it on the lab network. To restrict it to this machine, start
+it with `-addr 127.0.0.1:8088`. On Windows the first run may raise a firewall
+prompt — allow it on private networks only.
 
 Flags:
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `-addr` | `127.0.0.1:8088` | Console listen address |
+| `-addr` | `0.0.0.0:8088` | Console listen address; use `127.0.0.1:8088` for local only |
 | `-data` | `data` | Directory holding `profiles.json` |
 | `-open` | `true` | Open a browser on start |
 | `-sink` | *(off)* | Run as a syslog receiver instead, e.g. `-sink :5514` |
@@ -101,12 +119,55 @@ main.go                  entry point, flags, embedded web assets
 internal/core/           shared types: Env, Profile, Control, Payload, Ctx + generators
 internal/store/          JSON persistence for profiles and estate
 internal/sender/         syslog encoding (3164/5424/raw) and UDP/TCP transport
-internal/catalog/        control registry — log sources register here
+internal/catalog/        control registry
+  windows.go             30 Windows event log controls
+  linux.go               25 Linux syslog controls
+  web.go                 Nginx + Apache, generated from one shared case table
 internal/sink/           local syslog receiver for testing
 internal/server/         HTTP API and console
 web/                     operator console (no build step, no framework)
 data/profiles.json       created on first run
 ```
+
+## Windows output formats
+
+A Windows control is defined once in a format-neutral shape and rendered by the
+profile's **Windows format** setting:
+
+**Snare** (`MSWinEventLog`) — fifteen tab-separated fields, which is what Wazuh's
+`windows` decoder reads from a syslog feed. Field 13 (DataString) is left empty,
+as Snare itself leaves it, so two tabs appear in a row before the description.
+The multi-line description is flattened, and tabs inside it are replaced with
+spaces — a stray tab there would be read as a field separator and shift every
+field after it.
+
+```
+<132>Sep 29 13:53:04 WIN-DC01 MSWinEventLog	2	Security	498298	Tue Sep 29 13:53:04 2026	4625	Microsoft-Windows-Security-Auditing	SOCBYTE\tmiller	User	Failure Audit	WIN-DC01.socbyte.local	Logon		An account failed to log on. …	498298
+```
+
+**JSON** — the eventchannel envelope a Wazuh agent forwards, so a rule written
+against `win.system.*` and `win.eventdata.*` matches whether the record came
+from an agent or from here.
+
+```json
+{"win":{"system":{"providerName":"Microsoft-Windows-Security-Auditing","eventID":"4625","channel":"Security","severityValue":"AUDIT_FAILURE","message":"An account failed to log on.\r\n…"},"eventdata":{"targetUserName":"mkhan","logonType":"3","status":"0xc000006d","subStatus":"0xc000006a","ipAddress":"209.241.137.233"}}}
+```
+
+## Web log framing
+
+Web access logs are the one place the default is worth thinking about.
+
+With **Web raw** off (the default) records are sent as a real rsyslog forward
+would send them, header and tag included:
+
+```
+<190>Sep 29 13:53:04 web-prod01 httpd: 91.115.230.127 - - [29/Sep/2026:13:53:04 +0500] "GET /api/v1/items?id=1%20AND%20SLEEP(5)-- HTTP/1.1" 200 619 "-" "Mozilla/5.0 …"
+```
+
+With **Web raw** on, the bare combined line goes out with no header, which is
+what Wazuh's `web-accesslog` decoder reads most cleanly. The setting applies only
+to the Nginx and Apache sources; Windows and Linux records keep their header
+either way.
 
 ## Adding a log source
 
