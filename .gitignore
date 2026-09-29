@@ -9,3 +9,8 @@ data/
 # scratch from local testing
 *.out
 *.err
+*.log
+
+# QA artefacts
+qa-data/
+dist/
