@@ -1,5 +1,10 @@
 # LogGen
 
+[![CI](https://github.com/theshahrukh98khan/LogGen/actions/workflows/ci.yml/badge.svg)](https://github.com/theshahrukh98khan/LogGen/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/theshahrukh98khan/LogGen)](https://github.com/theshahrukh98khan/LogGen/releases/latest)
+[![Go](https://img.shields.io/github/go-mod/go-version/theshahrukh98khan/LogGen)](go.mod)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A log simulation lab for SIEM onboarding and detection-rule testing.
 
 LogGen generates correctly structured log records for common sources and ships
@@ -193,18 +198,45 @@ Linux (`sudo ./loggen -sink :514`); use a high port like `:5514` to avoid that.
 
 ### Running it
 
-The console binds to all interfaces on port 8088 and prints every URL it is
-reachable on:
+The console binds to all interfaces on port 8088, so it is reachable from other
+machines on the same network out of the box. On startup it prints every address
+it can be reached on, labelled by interface, so you know which one to type:
 
 ```
 LogGen console reachable at:
     http://127.0.0.1:8088  (this machine)
-    http://10.20.30.15:8088  (network)
+    http://192.168.18.7:8088  (Wi-Fi)
+    http://192.168.79.1:8088  (VMware Network Adapter VMnet1)
 ```
 
+Interfaces that are down, and addresses in `169.254.0.0/16`, are left out: a
+link-local address means the interface never got a lease, so nothing will reach
+it there.
+
+To use a different port, or to restrict it to this machine only:
+
+```sh
+./loggen -addr 0.0.0.0:9090        # all interfaces, port 9090
+./loggen -addr 127.0.0.1:8088      # this machine only
+./loggen -addr 192.168.18.7:8088   # one specific interface
+```
+
+**On Windows**, the first run raises a Windows Defender Firewall prompt. Allow
+it, or nothing on the network will reach the console even though it is listening.
+If you dismissed the prompt, add the rule from an elevated PowerShell:
+
+```powershell
+New-NetFirewallRule -DisplayName "LogGen console" -Direction Inbound `
+  -Protocol TCP -LocalPort 8088 -Action Allow -Profile Private
+```
+
+Use `-Profile Private,Public` only if the network you are on is classified as
+Public and you accept that. Check with `Get-NetConnectionProfile`.
+
 > **The console has no authentication and will send syslog traffic to any host
-> you point it at.** Keep it on a network you control. Run it with
-> `-addr 127.0.0.1:8088` to restrict it to the local machine.
+> you point it at.** Anyone who can reach the port can drive it. Keep it on a
+> network you control, and use `-addr 127.0.0.1:8088` when you do not need
+> access from another machine.
 
 | Flag | Default | Meaning |
 |---|---|---|
