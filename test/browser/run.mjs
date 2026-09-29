@@ -76,19 +76,79 @@ section('Navigation');
 ck('two sections', (await page.locator('#mainNav .nav-item').count()) === 2);
 await page.click('[data-view=admin]');
 await page.waitForTimeout(350);
-ck('Administration opens on destinations', await page.locator('#adminProfiles').isVisible());
-ck('the heading names the tab',
-  (await page.locator('#adminTitle').textContent()).includes('Destination'),
-  await page.locator('#adminTitle').textContent());
-await page.click('[data-admin=customs]');
-await page.waitForTimeout(300);
-ck('the controls tab opens', await page.locator('#adminCustoms').isVisible());
-ck('the heading follows the tab',
-  (await page.locator('#adminTitle').textContent()).toLowerCase().includes('log source'),
-  await page.locator('#adminTitle').textContent());
+ck('Administration opens on the hub', await page.locator('#adminHub').isVisible());
+ck('no panel is open on arrival',
+  !(await page.locator('#adminProfiles').isVisible()) &&
+  !(await page.locator('#adminCustoms').isVisible()) &&
+  !(await page.locator('#adminEstate').isVisible()));
+ck('back is hidden on the hub', !(await page.locator('#adminBack').isVisible()));
+
+// Every tile has a section heading above it and a panel behind it. A tile that
+// leads nowhere is the failure this catches.
+const groups = await page.locator('.hub-group').count();
+ck('the hub is grouped into sections', groups >= 4, `${groups} sections`);
+const tiles = await page.locator('#adminHub .tile').all();
+ck('every tile carries an icon and a label',
+  (await Promise.all(tiles.map(async (t) =>
+    (await t.locator('svg').count()) === 1 &&
+    (await t.locator('span').textContent()).trim().length > 0))).every(Boolean));
+
+for (const [tile, panel, word] of [
+  ['profiles', '#adminProfiles', 'target'],
+  ['customs', '#adminCustoms', 'control'],
+  ['tokens', '#adminTokens', 'placeholder'],
+  ['estate', '#adminEstate', 'estate'],
+  ['about', '#adminAbout', 'about'],
+]) {
+  await page.click(`[data-admin=${tile}]`);
+  await page.waitForTimeout(250);
+  ck(`the ${tile} tile opens its panel`, await page.locator(panel).isVisible());
+  ck(`the heading names ${tile}`,
+    (await page.locator('#adminTitle').textContent()).toLowerCase().includes(word),
+    await page.locator('#adminTitle').textContent());
+  ck(`the hub is put away for ${tile}`, !(await page.locator('#adminHub').isVisible()));
+  await page.click('#adminBack');
+  await page.waitForTimeout(250);
+  ck(`back returns to the hub from ${tile}`, await page.locator('#adminHub').isVisible());
+}
+
+// Escape steps back one level rather than leaving administration entirely.
 await page.click('[data-admin=estate]');
+await page.waitForTimeout(250);
+await page.keyboard.press('Escape');
+await page.waitForTimeout(250);
+ck('Escape steps back to the hub',
+  (await page.locator('#adminHub').isVisible()) && (await page.locator('#adminView').isVisible()));
+
+// The About page reads its facts from the API rather than hard-coding them.
+await page.click('[data-admin=about]');
+await page.waitForTimeout(250);
+const facts = await page.locator('#aboutFacts dt').allTextContents();
+ck('About reports the build and the data location',
+  facts.some((f) => /version/i.test(f)) && facts.some((f) => /configuration/i.test(f)),
+  facts.join(', '));
+const controlsFact = await page.locator('#aboutFacts dd').nth(1).textContent();
+ck('About counts the catalogue', Number(controlsFact) > 100, controlsFact);
+await page.click('#adminBack');
+await page.waitForTimeout(250);
+
+// The standalone placeholder reference lists the same tokens as the form.
+await page.click('[data-admin=tokens]');
+await page.waitForTimeout(250);
+const refTokens = await page.locator('#placeholderRef code[data-token]').count();
+ck('the placeholder reference is populated', refTokens > 10, `${refTokens} tokens`);
+await page.click('#adminBack');
+await page.waitForTimeout(250);
+
+// Deep links still land on a panel directly, which the destination bar relies on.
+await page.click('[data-view=send]');
 await page.waitForTimeout(300);
-ck('the estate tab opens', await page.locator('#adminEstate').isVisible());
+await page.click('#btnEditTarget');
+await page.waitForTimeout(350);
+ck('Edit target deep-links past the hub',
+  (await page.locator('#adminProfiles').isVisible()) &&
+  !(await page.locator('#adminHub').isVisible()));
+
 await page.click('[data-view=send]');
 await page.waitForTimeout(350);
 ck('Send returns to the workspace', await page.locator('#simView').isVisible());

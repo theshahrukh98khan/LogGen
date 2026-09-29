@@ -129,6 +129,9 @@ func (s *Store) ensureDefault() {
 // Environment
 // ---------------------------------------------------------------------------
 
+// Path is where the configuration is stored.
+func (s *Store) Path() string { return s.path }
+
 // Env returns the simulated estate.
 func (s *Store) Env() core.Env {
 	s.mu.RLock()

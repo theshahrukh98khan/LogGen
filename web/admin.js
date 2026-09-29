@@ -11,22 +11,64 @@
 // ---------------------------------------------------------------------------
 
 const ADMIN_COPY = {
-  profiles: ['Destinations', 'Where LogGen sends records'],
-  customs: ['Log sources & controls', 'Records you define yourself'],
+  hub: ['Administration', 'Everything LogGen lets you configure'],
+  profiles: ['SIEM targets', 'Where LogGen sends records'],
+  customs: ['Custom controls', 'Records you define yourself'],
+  tokens: ['Placeholders', 'Tokens a custom control can expand'],
   estate: ['Simulated estate', 'The organisation every record refers to'],
+  about: ['About', 'This build and where it keeps its configuration'],
 };
 
+const ADMIN_PANELS = {
+  profiles: 'adminProfiles',
+  customs: 'adminCustoms',
+  tokens: 'adminTokens',
+  estate: 'adminEstate',
+  about: 'adminAbout',
+};
+
+// showAdminTab drives both levels of the administration view: "hub" shows the
+// landing grid, any other name opens that one panel with a way back. Naming a
+// panel directly still works, so a deep link such as the Edit button on the
+// destination bar lands where it always did.
 function showAdminTab(name) {
+  if (!ADMIN_PANELS[name]) name = 'hub';
   state.adminTab = name;
-  document.querySelectorAll('.admin-tabs .tab').forEach((b) =>
-    b.classList.toggle('active', b.dataset.admin === name));
-  const panels = { customs: 'adminCustoms', profiles: 'adminProfiles', estate: 'adminEstate' };
-  Object.entries(panels).forEach(([n, id]) =>
+
+  const onHub = name === 'hub';
+  $('adminHub').classList.toggle('hidden', !onHub);
+  $('adminBack').classList.toggle('hidden', onHub);
+  Object.entries(ADMIN_PANELS).forEach(([n, id]) =>
     $(id).classList.toggle('hidden', n !== name));
 
-  const copy = ADMIN_COPY[name] || ADMIN_COPY.profiles;
+  const copy = ADMIN_COPY[name];
   $('adminTitle').textContent = copy[0];
   $('adminSub').textContent = copy[1];
+
+  if (name === 'tokens') renderPlaceholders($('placeholderRef'));
+  if (name === 'about') renderAbout();
+
+  // Focus the heading so a keyboard user is told where they landed instead of
+  // being left on a tile that has just been hidden.
+  $('adminTitle').setAttribute('tabindex', '-1');
+  $('adminTitle').focus({ preventScroll: true });
+}
+
+// renderAbout fills the About page from whatever /api/state reported.
+function renderAbout() {
+  const sources = (state.sources || []).length;
+  const facts = [
+    ['Version', state.version || 'dev'],
+    ['Controls', String((state.controls || []).length)],
+    ['Log sources', String(sources)],
+    ['Your controls', String((state.customs || []).length)],
+    ['Destinations', String((state.profiles || []).length)],
+    ['Configuration', state.dataDir || 'data/profiles.json'],
+    ['Console', location.origin],
+  ];
+  $('aboutFacts').innerHTML = facts
+    .map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`)
+    .join('');
 }
 
 // ---------------------------------------------------------------------------
@@ -62,8 +104,8 @@ function buildFacilitySelects() {
 // Placeholder reference
 // ---------------------------------------------------------------------------
 
-function renderPlaceholders() {
-  const box = $('placeholderList');
+function renderPlaceholders(mount) {
+  const box = mount || $('placeholderList');
   if (!box) return;
 
   const groups = {};
@@ -247,9 +289,11 @@ $('btnCloseAdmin').onclick = () => showView('send');
 // Edit on the destination bar goes straight to the destinations tab.
 $('btnEditTarget').onclick = () => showView('admin', 'profiles');
 
-document.querySelectorAll('.admin-tabs .tab').forEach((b) => {
+document.querySelectorAll('#adminHub .tile').forEach((b) => {
   b.onclick = () => showAdminTab(b.dataset.admin);
 });
+
+$('adminBack').onclick = () => showAdminTab('hub');
 
 // ---------------------------------------------------------------------------
 // Keyboard
@@ -273,6 +317,12 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (!$('drawer').classList.contains('hidden')) {
       $('drawer').classList.add('hidden');
+      return;
+    }
+    // Inside an administration panel, Escape steps back to the hub rather than
+    // out of administration altogether, so one key does not lose two levels.
+    if (state.view === 'admin' && state.adminTab !== 'hub') {
+      showAdminTab('hub');
       return;
     }
     if (document.activeElement === $('search')) {

@@ -62,6 +62,8 @@ async function boot() {
     state.controls = s.controls;
     state.customs = s.customs || [];
     state.sources = s.sources || [];
+    state.version = s.version || '';
+    state.dataDir = s.dataDir || '';
     state.placeholders = await api('GET', '/api/placeholders');
   } catch (err) {
     toast(`Could not load state: ${err.message}`, 'bad');
@@ -238,7 +240,7 @@ function showView(view, adminTab) {
 
   if (!admin) return;
 
-  showAdminTab(adminTab || state.adminTab || 'profiles');
+  showAdminTab(adminTab || 'hub');
   renderProfileList();
   renderCustomList();
   renderSourceOptions();
