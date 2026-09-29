@@ -395,11 +395,11 @@ function card(c) {
       '<button class="card-send" type="button">Send</button>' +
     '</div>';
 
-  // Sending is deliberate. The card body opens the details drawer, which
-  // changes nothing, so a stray click can never put a record on the wire.
+  // The card body does nothing. Both actions live on their own buttons, which
+  // appear on hover, so neither sending nor opening a panel is ever something
+  // a stray click can cause.
   el.querySelector('.card-open').onclick = (e) => { e.stopPropagation(); openDrawer(c); };
   el.querySelector('.card-send').onclick = (e) => { e.stopPropagation(); send(c, {}); };
-  el.onclick = () => openDrawer(c);
   el.onkeydown = (e) => {
     if (e.key === 'Enter') { e.preventDefault(); send(c, {}); }
     if (e.key === ' ') { e.preventDefault(); openDrawer(c); }

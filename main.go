@@ -67,6 +67,10 @@ func main() {
 	}
 
 	log.SetFlags(log.Ltime)
+	// Go's log package writes to stderr by default, which means "loggen > file"
+	// captures nothing. What this prints is a startup banner and a request log,
+	// not errors, so it belongs on stdout where redirecting it works.
+	log.SetOutput(os.Stdout)
 
 	// Sink mode turns the same binary into a local collector, so the pipeline
 	// can be verified without pointing at a live Wazuh manager.

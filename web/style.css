@@ -516,13 +516,11 @@ main {
   border: 1px solid var(--line);
   border-radius: var(--r);
   padding: 11px 12px 10px;
-  cursor: pointer;
   transition: border-color .12s, background .12s, transform .12s;
 }
 .card:hover {
   border-color: var(--line-2);
   background: var(--raised);
-  transform: translateY(-1px);
 }
 
 .card:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
@@ -581,6 +579,18 @@ main {
   bottom: 9px; right: 10px;
   display: flex;
   gap: 5px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .12s;
+}
+
+/* Revealed on hover, and on keyboard focus so the buttons stay reachable
+   without a mouse. */
+.card:hover .card-actions,
+.card:focus-within .card-actions,
+.card:focus-visible .card-actions {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .card-open,
@@ -617,7 +627,9 @@ main {
 
 /* The Details button sits bottom-right, so the tag row keeps clear of it. */
 /* The action buttons sit bottom-right, so the tag row keeps clear of them. */
-.tags { display: flex; flex-wrap: wrap; gap: 4px; padding-right: 118px; min-height: 20px; }
+.tags { display: flex; flex-wrap: wrap; gap: 4px; min-height: 22px; transition: padding-right .12s; }
+.card:hover .tags,
+.card:focus-within .tags { padding-right: 118px; }
 
 .tag {
   font-size: 9.5px;
