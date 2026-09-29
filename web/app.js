@@ -599,11 +599,28 @@ function renderActivity(list) {
 async function refreshActivity() {
   let list;
   try {
-    list = await api('GET', '/api/activity');
+    // Fetched directly rather than through api() so the build header can be
+    // read off the response.
+    const res = await fetch('/api/activity', { headers: { Accept: 'application/json' } });
+    if (!res.ok) return;
+    noteBuild(res.headers.get('X-LogGen-Version'));
+    list = await res.json();
   } catch {
     return;
   }
   renderActivity(list);
+}
+
+// noteBuild watches which binary is answering. The first reply sets the
+// baseline; any later change means this page came from a build that is no
+// longer running, so its markup and stylesheet are stale.
+//
+// It offers a reload rather than taking one, because a reload here would throw
+// away whatever is half typed into a form.
+function noteBuild(v) {
+  if (!v) return;
+  if (!state.build) { state.build = v; return; }
+  if (v !== state.build) $('stale').classList.remove('hidden');
 }
 
 // ---------------------------------------------------------------------------

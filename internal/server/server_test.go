@@ -1,6 +1,8 @@
 package server
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/theshahrukh98khan/LogGen/internal/core"
@@ -62,5 +64,31 @@ func TestActivityRingKeepsTheNewest(t *testing.T) {
 	}
 	if feed[len(feed)-1].Seq != 51 {
 		t.Errorf("oldest retained Seq = %d, want 51", feed[len(feed)-1].Seq)
+	}
+}
+
+// TestVersionHeader covers the header a console left open across a rebuild
+// uses to notice that its markup and stylesheet came from a binary that is no
+// longer running.
+func TestVersionHeader(t *testing.T) {
+	ok := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	s := &Server{Version: "v9.9.9-test"}
+	rec := httptest.NewRecorder()
+	s.stamp(ok).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/activity", nil))
+	if got := rec.Header().Get("X-LogGen-Version"); got != "v9.9.9-test" {
+		t.Errorf("X-LogGen-Version = %q, want %q", got, "v9.9.9-test")
+	}
+
+	// An unstamped build must not send an empty header. The console treats a
+	// change in this value as a rebuild, and empty to empty is not a change,
+	// but sending it at all invites that comparison to go wrong.
+	plain := &Server{}
+	rec = httptest.NewRecorder()
+	plain.stamp(ok).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/activity", nil))
+	if _, sent := rec.Header()["X-Loggen-Version"]; sent {
+		t.Error("an unversioned build should not send the header at all")
 	}
 }

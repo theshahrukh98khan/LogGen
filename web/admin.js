@@ -286,6 +286,8 @@ document.querySelectorAll('#mainNav .nav-item').forEach((b) => {
   b.onclick = () => guard(() => showView(b.dataset.view));
 });
 
+$('staleReload').onclick = () => guard(() => location.reload());
+
 $('brandHome').onclick = (e) => {
   e.preventDefault();
   guard(() => showView('send'));

@@ -26,6 +26,13 @@
   </div>
 </header>
 
+<!-- Shown when the binary serving this page is not the one it loaded from. -->
+<div id="stale" class="stale hidden" role="status">
+  <span>This console was built by an older LogGen than the one now running.
+    Reload to pick up the current build.</span>
+  <button id="staleReload" class="btn small primary">Reload</button>
+</div>
+
 <!-- The destination, always visible, with its real state. Sending to nowhere
      is the failure people hit first, so it cannot be a detail in a corner. -->
 <div class="targetbar" id="targetBar">
