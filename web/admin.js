@@ -10,12 +10,23 @@
 // View switching
 // ---------------------------------------------------------------------------
 
+const ADMIN_COPY = {
+  profiles: ['Destinations', 'Where LogGen sends records'],
+  customs: ['Log sources & controls', 'Records you define yourself'],
+  estate: ['Simulated estate', 'The organisation every record refers to'],
+};
+
 function showAdminTab(name) {
+  state.adminTab = name;
   document.querySelectorAll('.admin-tabs .tab').forEach((b) =>
     b.classList.toggle('active', b.dataset.admin === name));
   const panels = { customs: 'adminCustoms', profiles: 'adminProfiles', estate: 'adminEstate' };
   Object.entries(panels).forEach(([n, id]) =>
     $(id).classList.toggle('hidden', n !== name));
+
+  const copy = ADMIN_COPY[name] || ADMIN_COPY.profiles;
+  $('adminTitle').textContent = copy[0];
+  $('adminSub').textContent = copy[1];
 }
 
 // ---------------------------------------------------------------------------
@@ -233,7 +244,8 @@ document.querySelectorAll('#mainNav .nav-item').forEach((b) => {
 });
 
 $('btnCloseAdmin').onclick = () => showView('send');
-$('btnEditTarget').onclick = () => showView('targets');
+// Edit on the destination bar goes straight to the destinations tab.
+$('btnEditTarget').onclick = () => showView('admin', 'profiles');
 
 document.querySelectorAll('.admin-tabs .tab').forEach((b) => {
   b.onclick = () => showAdminTab(b.dataset.admin);

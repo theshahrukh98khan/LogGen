@@ -224,26 +224,21 @@ function renderRecent() {
 // Views
 // ---------------------------------------------------------------------------
 
-const VIEW_COPY = {
-  library: ['Library', 'Your own log sources and records'],
-  targets: ['Destinations', 'Where LogGen sends records'],
-};
-
-function showView(view) {
+// showView switches between sending and administration. Everything that is
+// configuration rather than simulation lives behind the one Administration
+// section, so the top level stays a choice between doing and setting up.
+function showView(view, adminTab) {
   state.view = view;
   document.querySelectorAll('#mainNav .nav-item').forEach((b) =>
     b.classList.toggle('active', b.dataset.view === view));
 
-  const admin = view !== 'send';
+  const admin = view === 'admin';
   $('adminView').classList.toggle('hidden', !admin);
   $('simView').classList.toggle('hidden', admin);
 
   if (!admin) return;
 
-  const copy = VIEW_COPY[view] || VIEW_COPY.library;
-  $('adminTitle').textContent = copy[0];
-  $('adminSub').textContent = copy[1];
-  showAdminTab(view === 'targets' ? 'profiles' : 'customs');
+  showAdminTab(adminTab || state.adminTab || 'profiles');
   renderProfileList();
   renderCustomList();
   renderSourceOptions();
@@ -395,12 +390,19 @@ function card(c) {
     '<div class="card-title">' + esc(c.name) + '</div>' +
     '<div class="card-desc">' + esc(c.desc || '') + '</div>' +
     '<div class="tags">' + tags.join('') + '</div>' +
-    '<button class="card-open" type="button">Details</button>';
+    '<div class="card-actions">' +
+      '<button class="card-open" type="button">Details</button>' +
+      '<button class="card-send" type="button">Send</button>' +
+    '</div>';
 
+  // Sending is deliberate. The card body opens the details drawer, which
+  // changes nothing, so a stray click can never put a record on the wire.
   el.querySelector('.card-open').onclick = (e) => { e.stopPropagation(); openDrawer(c); };
-  el.onclick = () => send(c, {});
+  el.querySelector('.card-send').onclick = (e) => { e.stopPropagation(); send(c, {}); };
+  el.onclick = () => openDrawer(c);
   el.onkeydown = (e) => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); send(c, {}); }
+    if (e.key === 'Enter') { e.preventDefault(); send(c, {}); }
+    if (e.key === ' ') { e.preventDefault(); openDrawer(c); }
   };
   return el;
 }
