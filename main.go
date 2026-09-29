@@ -105,18 +105,37 @@ func consoleURLs(addr string) (local string, all []string) {
 	local = "http://" + net.JoinHostPort("127.0.0.1", port)
 	all = append(all, local+"  (this machine)")
 
-	// A wildcard bind answers on every interface, but only the routable
-	// addresses are useful to somebody on another host.
-	ifaces, err := net.InterfaceAddrs()
+	// A wildcard bind answers on every interface, but most of them are no use
+	// to somebody on another host. Machines commonly carry a pile of virtual
+	// and disconnected adapters, and listing them all buries the one address
+	// the operator actually wants to type.
+	ifaces, err := net.Interfaces()
 	if err != nil {
 		return local, all
 	}
-	for _, a := range ifaces {
-		ipnet, ok := a.(*net.IPNet)
-		if !ok || ipnet.IP.IsLoopback() || ipnet.IP.To4() == nil {
+	for _, iface := range ifaces {
+		// Skip anything that is down or is the loopback device.
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
 			continue
 		}
-		all = append(all, "http://"+net.JoinHostPort(ipnet.IP.String(), port)+"  (network)")
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, a := range addrs {
+			ipnet, ok := a.(*net.IPNet)
+			if !ok {
+				continue
+			}
+			ip := ipnet.IP.To4()
+			// IPv4 only, and skip 169.254.x.x: a link-local address means the
+			// interface never got a lease, so nothing will reach it there.
+			if ip == nil || ip.IsLoopback() || ip.IsLinkLocalUnicast() {
+				continue
+			}
+			all = append(all, "http://"+net.JoinHostPort(ip.String(), port)+
+				"  ("+iface.Name+")")
+		}
 	}
 	return local, all
 }
