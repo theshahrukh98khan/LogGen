@@ -728,6 +728,7 @@ input[type=text], input[type=search], input[type=number], input:not([type]) {
   padding: 7px 9px;
   font-family: var(--sans);
   font-size: 13px;
+  line-height: 1.35;
   width: 100%;
 }
 textarea { font-family: var(--mono); font-size: 12.5px; line-height: 1.6; resize: vertical; }
@@ -969,6 +970,19 @@ input:focus, select:focus, textarea:focus {
 }
 .form-grid label.check input, .form label.check input { width: auto; }
 .form .opt { color: var(--faint); text-transform: none; letter-spacing: 0; font-weight: 400; }
+
+/* A field whose caption carries a hint is a line taller than the ones beside
+   it, which used to push its control down and leave the row ragged. Captions
+   stay at the top of their cell and controls are pushed to the bottom, so a
+   hint grows the caption without moving anything else off the line. */
+.form-grid label:not(.check) > input,
+.form-grid label:not(.check) > select,
+.form-grid label:not(.check) > textarea,
+.form-grid label:not(.check) > datalist + input { margin-top: auto; }
+
+/* A checkbox is shorter than an input, so it is given the same height and sat
+   on the same baseline rather than floating in the middle of the cell. */
+.form-grid label.check { align-self: end; min-height: 34px; }
 .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
 
 .profile-list { display: flex; flex-direction: column; gap: 7px; }

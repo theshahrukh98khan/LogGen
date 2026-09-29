@@ -517,10 +517,69 @@ await page.waitForTimeout(300);
 await page.fill('#search', '');
 
 // ---------------------------------------------------------------------------
+section('Form alignment');
+
+await page.click('[data-view=admin]');
+await page.waitForTimeout(300);
+await page.click('[data-admin=profiles]');
+await page.waitForTimeout(400);
+
+// Host carries a hint under its caption and Port does not. They sit next to
+// each other, so if a hint moves its own control the two stop lining up.
+const box = (sel) => page.locator(sel).evaluate((e) => {
+  const r = e.getBoundingClientRect();
+  return { top: Math.round(r.top), bottom: Math.round(r.bottom), h: Math.round(r.height) };
+});
+const host = await box('#pf_host');
+const port = await box('#pf_port');
+ck('a hint does not push its own control out of line',
+  Math.abs(host.bottom - port.bottom) <= 1,
+  `host bottom ${host.bottom}, port bottom ${port.bottom}`);
+ck('controls in a row are the same height',
+  Math.abs(host.h - port.h) <= 1, `${host.h} vs ${port.h}`);
+
+// Captions stay at the top of their cell, so the hint grows downward into the
+// gap rather than shifting the row.
+const capTops = await page.locator('#profileForm .form-grid > label:not(.check)')
+  .evaluateAll((els) => els.slice(0, 5).map((e) => Math.round(e.getBoundingClientRect().top)));
+ck('captions in a row start level',
+  new Set(capTops).size === 1, capTops.join(', '));
+
+// An input and a select must match, or every row with both looks staggered.
+const sel = await box('#pf_protocol');
+ck('inputs and selects are the same height',
+  Math.abs(sel.h - port.h) <= 1, `select ${sel.h}, input ${port.h}`);
+ck('inputs and selects sit on the same line',
+  Math.abs(sel.bottom - port.bottom) <= 1);
+
+// The same rule has to hold on the control form, which has more hinted fields.
+await page.click('#adminBack');
+await page.waitForTimeout(250);
+await page.click('[data-admin=customs]');
+await page.waitForTimeout(400);
+const ev = await box('#cc_eventid');
+const ch = await box('#cc_channel');
+const mi = await box('#cc_mitre');
+ck('hinted fields line up with each other',
+  Math.abs(ev.bottom - ch.bottom) <= 1 && Math.abs(ev.bottom - mi.bottom) <= 1,
+  `${ev.bottom}, ${ch.bottom}, ${mi.bottom}`);
+
+await page.click('#adminBack');
+await page.waitForTimeout(250);
+await page.click('[data-view=send]');
+await page.waitForTimeout(300);
+
+// ---------------------------------------------------------------------------
 section('Accessibility');
 
 ck('cards are keyboard reachable',
   await page.evaluate(() => document.querySelector('.card').tabIndex >= 0));
+// :focus-visible only matches once the browser believes it is being driven by
+// a keyboard, so this presses a key first. Without it the check passes or fails
+// on whatever the previous section happened to do last, which is not a property
+// of the stylesheet at all.
+await page.keyboard.press('Tab');
+await page.waitForTimeout(100);
 ck('focus is visible', await page.evaluate(() => {
   const c = document.querySelector('.card');
   c.focus();
