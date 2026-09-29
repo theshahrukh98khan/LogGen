@@ -1,6 +1,7 @@
 # build output
 loggen
 loggen.exe
+loggen.exe~
 *.exe
 
 # runtime config, machine specific
