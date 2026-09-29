@@ -636,7 +636,7 @@ function renderProfileList() {
       } catch (err) { toast(err.message, 'bad'); }
     };
     row.querySelector('[data-act=delete]').onclick = async () => {
-      if (!confirm(`Delete profile "${p.name}"?`)) return;
+      if (!await confirmDelete('destination', p.name)) return;
       try {
         await api('DELETE', `/api/profiles/${p.id}`);
         state.profiles = await api('GET', '/api/profiles');
@@ -735,36 +735,94 @@ function isDirty(id) {
 // through this same guard.
 function pendingEdit() {
   if (state.view !== 'admin') return null;
+  if (!$('dialog').classList.contains('hidden')) return null;
   return GUARDED.find((g) =>
     !$(g.panel).classList.contains('hidden') && isDirty(g.form)) || null;
 }
 
-// askToLeave resolves to 'save', 'discard' or 'cancel'.
-function askToLeave(what) {
+// ask puts a question on screen and resolves to the value of the answer.
+//
+// It replaces confirm(), which cannot be styled, offers only two answers, and
+// heads its box with the host name, so a question from this console reads as
+// though the browser is asking it.
+//
+// actions are rendered left to right; the one marked safe is focused and is
+// what Escape and a backdrop click resolve to, so the harmless answer is
+// always the one reached by reflex.
+function ask({ title, body, actions }) {
   return new Promise((resolve) => {
-    const box = $('leaveGuard');
-    $('leaveBody').textContent =
-      `Your changes to ${what} have not been saved. Saving keeps them; ` +
-      `discarding returns the form to the last saved values.`;
-    box.classList.remove('hidden');
+    const box = $('dialog');
+    const row = $('dialogActions');
+    const restoreTo = document.activeElement;
 
-    const done = (answer) => {
+    $('dialogTitle').textContent = title;
+    $('dialogBody').textContent = body;
+    row.innerHTML = '';
+
+    const safe = actions.find((a) => a.safe) || actions[0];
+    const done = (value) => {
       box.classList.add('hidden');
       document.removeEventListener('keydown', onKey, true);
-      resolve(answer);
-    };
-    const onKey = (e) => {
-      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done('cancel'); }
+      if (restoreTo && restoreTo.focus) restoreTo.focus({ preventScroll: true });
+      resolve(value);
     };
 
-    $('leaveSave').onclick = () => done('save');
-    $('leaveDiscard').onclick = () => done('discard');
-    $('leaveCancel').onclick = () => done('cancel');
-    // A click on the backdrop is the same as cancelling: it is the answer that
-    // cannot lose anything.
-    box.onclick = (e) => { if (e.target === box) done('cancel'); };
+    // Escape answers safely. Tab is held inside the box: with the app still in
+    // the background, tabbing out lands on controls that cannot be used.
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault(); e.stopPropagation(); done(safe.value); return;
+      }
+      if (e.key !== 'Tab') return;
+      const btns = [...row.querySelectorAll('button')];
+      if (!btns.length) return;
+      const edge = e.shiftKey ? btns[0] : btns[btns.length - 1];
+      if (document.activeElement === edge) {
+        e.preventDefault();
+        (e.shiftKey ? btns[btns.length - 1] : btns[0]).focus();
+      }
+    };
+
+    actions.forEach((a) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.id = 'dlg_' + a.value;
+      b.className = 'btn' + (a.kind ? ' ' + a.kind : '');
+      b.textContent = a.label;
+      b.onclick = () => done(a.value);
+      row.appendChild(b);
+    });
+
+    box.onclick = (e) => { if (e.target === box) done(safe.value); };
     document.addEventListener('keydown', onKey, true);
-    $('leaveCancel').focus();
+    box.classList.remove('hidden');
+    $('dlg_' + safe.value).focus();
+  });
+}
+
+// confirmDelete asks before something is removed for good.
+function confirmDelete(what, name) {
+  return ask({
+    title: `Delete this ${what}?`,
+    body: `"${name}" will be removed. This cannot be undone.`,
+    actions: [
+      { value: 'cancel', label: 'Cancel', safe: true },
+      { value: 'delete', label: `Delete ${what}`, kind: 'danger' },
+    ],
+  }).then((a) => a === 'delete');
+}
+
+// askToLeave resolves to 'save', 'discard' or 'cancel'.
+function askToLeave(what) {
+  return ask({
+    title: 'Unsaved changes',
+    body: `Your changes to ${what} have not been saved. Saving keeps them; ` +
+      `discarding returns the form to the last saved values.`,
+    actions: [
+      { value: 'cancel', label: 'Keep editing', safe: true },
+      { value: 'discard', label: 'Discard' },
+      { value: 'save', label: 'Save', kind: 'primary' },
+    ],
   });
 }
 

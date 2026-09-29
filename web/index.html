@@ -395,18 +395,15 @@
   · <a href="https://github.com/theshahrukh98khan/LogGen" target="_blank" rel="noopener noreferrer">Source</a>
 </footer>
 
-<!-- Asked before navigation throws away edits. Three answers, so it cannot be
-     a native confirm(), which only offers two. -->
-<div id="leaveGuard" class="modal hidden" role="dialog" aria-modal="true"
-     aria-labelledby="leaveTitle" aria-describedby="leaveBody">
+<!-- Every question the console asks. A native confirm() cannot be styled, only
+     offers two answers, and names the host rather than the thing being acted
+     on, so it reads as though the browser is asking. -->
+<div id="dialog" class="modal hidden" role="dialog" aria-modal="true"
+     aria-labelledby="dialogTitle" aria-describedby="dialogBody">
   <div class="modal-box">
-    <h3 id="leaveTitle">Unsaved changes</h3>
-    <p id="leaveBody" class="hint"></p>
-    <div class="modal-actions">
-      <button id="leaveCancel" class="btn">Keep editing</button>
-      <button id="leaveDiscard" class="btn">Discard</button>
-      <button id="leaveSave" class="btn primary">Save</button>
-    </div>
+    <h3 id="dialogTitle"></h3>
+    <p id="dialogBody" class="hint"></p>
+    <div id="dialogActions" class="modal-actions"></div>
   </div>
 </div>
 

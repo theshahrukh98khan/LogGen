@@ -767,6 +767,13 @@ input:focus, select:focus, textarea:focus {
 .btn.small { padding: 4px 9px; font-size: 11.5px; }
 .btn.danger { color: var(--sev-high); }
 .btn.danger:hover { color: #FF7A72; }
+.modal .btn.danger {
+  color: var(--ink);
+  background: var(--sev-high);
+  border-color: var(--sev-high);
+  font-weight: 600;
+}
+.modal .btn.danger:hover { color: var(--ink); background: #FF7A72; border-color: #FF7A72; }
 
 /* ---------------------------------------------------------------------------
    Drawer

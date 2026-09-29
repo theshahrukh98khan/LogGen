@@ -173,7 +173,7 @@ function renderCustomList() {
       $('cc_source').scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
     row.querySelector('[data-act=delete]').onclick = async () => {
-      if (!confirm('Delete custom control "' + c.name + '"?')) return;
+      if (!await confirmDelete('control', c.name)) return;
       try {
         await api('DELETE', '/api/customs/' + c.id);
         await reloadCatalog();
