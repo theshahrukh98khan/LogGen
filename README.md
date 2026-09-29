@@ -19,6 +19,7 @@ so it works with any collector that does.
 - No runtime dependencies, no third-party Go modules, no build step for the UI
 - 163 controls across Windows, Linux, Nginx, Apache and Oracle Database
 - Multiple SIEM target profiles: host, port, TCP/UDP, syslog format
+- An Administration view for adding your own log sources and records
 - Every record shows you the exact bytes that went on the wire
 - A built-in syslog receiver, so you can verify the pipeline before pointing it
   at anything real
@@ -303,6 +304,56 @@ that every generated record draws from. Setting it once is what makes a Windows
 logon, a sudo call and an Nginx hit look like they came from the same
 organisation. Domain and user SIDs are derived from these names, so an account
 keeps the same SID across restarts.
+
+## Administration
+
+Everything configurable lives behind the **Administration** button: target
+profiles, the simulated estate, and your own controls.
+
+### Adding your own records
+
+Built-in controls are compiled in, which is what lets them reproduce a format
+exactly. The Administration view adds a second kind: a control you define
+yourself, saved to disk, which appears in the simulation view alongside the rest.
+
+Use it to add a record to a source that already exists, or type a **new source
+name** to create one. A source nobody has written Go code for is simulated the
+same way.
+
+A control carries a **record template** with `{{placeholder}}` tokens:
+
+```
+Connection closed by authenticating user {{user}} {{external_ip}} port {{port}} [preauth]
+```
+
+Roughly thirty tokens are available, listed in the form and insertable by
+clicking. They cover the estate (`{{domain}}`, `{{winhost}}`, `{{dbname}}`),
+identities (`{{user}}`, `{{admin}}`, `{{sid}}`), the network (`{{internal_ip}}`,
+`{{external_ip}}`, `{{port}}`, `{{mac}}`), system values (`{{pid}}`, `{{uuid}}`,
+`{{logon_id}}`, `{{hex:8}}`), time (`{{timestamp}}`, `{{syslog_time}}`,
+`{{epoch}}`) and randomness (`{{int:1-50}}`, `{{pick:a|b|c}}`).
+
+You also set the syslog tag, facility, severity, and whether a PID follows the
+tag, so a custom record is framed exactly like a real one.
+
+### Parameters
+
+Declaring a parameter gives the control an editable field in the simulation
+view's detail drawer, just like a built-in one. Each parameter takes a
+**default**, which may itself be a token:
+
+| Parameter | Default | Result |
+|---|---|---|
+| `srcip` | `{{external_ip}}` | generated when left blank, used verbatim when typed |
+
+A token naming a declared parameter is always resolved, so an unfilled field
+never leaks `{{braces}}` into a record. A token that is neither a parameter nor a
+known placeholder is left **as written**, so a typo shows up in the preview
+instead of silently becoming an empty string.
+
+Preview renders the real wire format before you save.
+
+Custom controls persist in `data/profiles.json` and cannot shadow a built-in ID.
 
 ## Sending
 

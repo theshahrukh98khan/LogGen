@@ -17,6 +17,13 @@ type Ctx struct {
 	Now    time.Time
 	params map[string]string
 	rnd    *rand.Rand
+
+	// declared are the parameters the control advertises. A token naming one of
+	// these is always resolved, even when the operator left the field blank, so
+	// an unfilled parameter never leaks {{braces}} into a record. A token that
+	// is not a declared parameter and not a generator is left alone, so a typo
+	// stays visible in the preview.
+	declared map[string]Param
 }
 
 // NewCtx builds a render context. params may be nil.
@@ -30,6 +37,23 @@ func NewCtx(env Env, params map[string]string) *Ctx {
 		params: params,
 		rnd:    rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
+}
+
+// Declare registers the parameters a control advertises.
+func (c *Ctx) Declare(params []Param) {
+	if len(params) == 0 {
+		return
+	}
+	c.declared = make(map[string]Param, len(params))
+	for _, p := range params {
+		c.declared[p.Key] = p
+	}
+}
+
+// Declared reports the parameter registered under key, if any.
+func (c *Ctx) Declared(key string) (Param, bool) {
+	p, ok := c.declared[key]
+	return p, ok
 }
 
 // Rand exposes the underlying generator for callers that need it directly.
@@ -194,6 +218,15 @@ func (c *Ctx) UserSID(user string) string {
 // WinFQDN is the Windows host as a fully qualified name.
 func (c *Ctx) WinFQDN() string {
 	return strings.ToUpper(c.Env.WinHost) + "." + strings.ToLower(c.Env.Domain)
+}
+
+// MAC renders a random MAC address.
+func (c *Ctx) MAC() string {
+	parts := make([]string, 6)
+	for i := range parts {
+		parts[i] = strings.ToLower(c.Hex(2))
+	}
+	return strings.Join(parts, ":")
 }
 
 // UPN builds user@domain.

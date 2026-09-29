@@ -22,12 +22,12 @@
     <select id="profileSelect"></select>
     <span id="targetAddr" class="addr"></span>
     <button id="btnTest" class="btn ghost">Test</button>
-    <button id="btnProfiles" class="btn ghost">Profiles</button>
-    <button id="btnEnv" class="btn ghost">Estate</button>
+    <button id="btnAdmin" class="btn ghost">Administration</button>
   </div>
 </header>
 
-<main>
+<!-- ===================== Simulation view ===================== -->
+<main id="simView">
   <section class="panel controls">
     <div class="panel-head">
       <h2>Controls</h2>
@@ -59,6 +59,197 @@
   </section>
 </main>
 
+<!-- ===================== Administration view ===================== -->
+<section id="adminView" class="admin hidden">
+  <div class="admin-head">
+    <div>
+      <h2>Administration</h2>
+      <p class="sub">Targets, the simulated estate, and your own log sources</p>
+    </div>
+    <button id="btnCloseAdmin" class="btn primary">Back to controls</button>
+  </div>
+
+  <div class="admin-tabs">
+    <button class="tab active" data-admin="customs">Log sources &amp; controls</button>
+    <button class="tab" data-admin="profiles">SIEM profiles</button>
+    <button class="tab" data-admin="estate">Simulated estate</button>
+  </div>
+
+  <!-- ---------- Custom controls ---------- -->
+  <div id="adminCustoms" class="admin-panel">
+    <div class="admin-grid">
+
+      <div class="panel pad">
+        <h3>Your controls</h3>
+        <p class="hint">
+          Add a record to a source that already exists, or type a new source name
+          to create one. Custom controls are saved to disk and appear in the
+          simulation view alongside the built-in ones.
+        </p>
+        <div id="customList" class="profile-list"></div>
+      </div>
+
+      <div class="panel pad">
+        <h3 id="customFormTitle">New control</h3>
+        <form id="customForm" class="form">
+          <input type="hidden" id="cc_id">
+
+          <div class="form-grid">
+            <label>Log source
+              <input id="cc_source" list="sourceOptions" required placeholder="linux, windows, or a new name">
+              <datalist id="sourceOptions"></datalist>
+            </label>
+            <label>Group<input id="cc_group" placeholder="Authentication"></label>
+            <label>Name<input id="cc_name" required placeholder="SSH key rejected"></label>
+            <label>Severity
+              <select id="cc_severity">
+                <option value="info">info</option>
+                <option value="low">low</option>
+                <option value="medium">medium</option>
+                <option value="high">high</option>
+                <option value="critical">critical</option>
+              </select>
+            </label>
+          </div>
+
+          <label class="full">Description
+            <input id="cc_desc" placeholder="What this record means and why it matters">
+          </label>
+
+          <div class="form-grid">
+            <label>Event ID <span class="opt">optional</span><input id="cc_eventid" placeholder="4625"></label>
+            <label>Channel <span class="opt">optional</span><input id="cc_channel" placeholder="Security"></label>
+            <label>MITRE <span class="opt">comma separated</span><input id="cc_mitre" placeholder="T1110, T1078"></label>
+            <label>Wazuh rules <span class="opt">comma separated</span><input id="cc_wazuh" placeholder="5710"></label>
+          </div>
+
+          <h4>Wire settings</h4>
+          <div class="form-grid">
+            <label>Syslog tag<input id="cc_tag" placeholder="sshd"></label>
+            <label>Hostname <span class="opt">blank = from estate</span><input id="cc_host" placeholder="{{linuxhost}}"></label>
+            <label>Facility<select id="cc_facility"></select></label>
+            <label>Syslog severity<select id="cc_syslogsev"></select></label>
+            <label class="check">
+              <input type="checkbox" id="cc_pid">
+              <span>Include a PID after the tag</span>
+            </label>
+          </div>
+
+          <h4>Parameters <span class="opt">fields the operator can fill in before sending</span></h4>
+          <div id="cc_params" class="params-editor"></div>
+          <button type="button" id="cc_addParam" class="btn ghost small">Add parameter</button>
+
+          <h4>Record template</h4>
+          <label class="full">
+            <textarea id="cc_template" rows="5" required
+              placeholder="Failed password for {{user}} from {{external_ip}} port {{port}} ssh2"></textarea>
+          </label>
+
+          <details class="tokens">
+            <summary>Available placeholders</summary>
+            <div id="placeholderList" class="token-grid"></div>
+          </details>
+
+          <div class="form-actions">
+            <button type="button" id="cc_reset" class="btn ghost">New</button>
+            <button type="button" id="cc_preview" class="btn ghost">Preview</button>
+            <button type="submit" class="btn primary">Save control</button>
+          </div>
+          <pre id="cc_wire" class="wire hidden"></pre>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- Profiles ---------- -->
+  <div id="adminProfiles" class="admin-panel hidden">
+    <div class="admin-grid">
+      <div class="panel pad">
+        <h3>Targets</h3>
+        <p class="hint">Where records are sent. Configure several and switch between them from the top bar.</p>
+        <div id="profileList" class="profile-list"></div>
+      </div>
+
+      <div class="panel pad">
+        <h3 id="profileFormTitle">New profile</h3>
+        <form id="profileForm" class="form">
+          <input type="hidden" id="pf_id">
+          <div class="form-grid">
+            <label>Name<input id="pf_name" required placeholder="Wazuh Manager (prod)"></label>
+            <label>Host / IP<input id="pf_host" required placeholder="192.168.18.20"></label>
+            <label>Port<input id="pf_port" type="number" min="1" max="65535" value="514" required></label>
+            <label>Protocol
+              <select id="pf_protocol">
+                <option value="udp">UDP</option>
+                <option value="tcp">TCP</option>
+              </select>
+            </label>
+            <label>Syslog format
+              <select id="pf_format">
+                <option value="rfc3164">RFC 3164 (BSD)</option>
+                <option value="rfc5424">RFC 5424</option>
+                <option value="raw">Raw (no header)</option>
+              </select>
+            </label>
+            <label>TCP framing
+              <select id="pf_framing">
+                <option value="lf">Newline</option>
+                <option value="octet">Octet counting</option>
+              </select>
+            </label>
+            <label>Windows format
+              <select id="pf_winformat">
+                <option value="snare">Snare (MSWinEventLog)</option>
+                <option value="json">JSON (eventchannel)</option>
+              </select>
+            </label>
+            <label class="check">
+              <input type="checkbox" id="pf_webraw">
+              <span>Send web access logs without a syslog header</span>
+            </label>
+            <label class="check">
+              <input type="checkbox" id="pf_default">
+              <span>Use as default target</span>
+            </label>
+          </div>
+          <div class="form-actions">
+            <button type="button" id="pf_reset" class="btn ghost">New</button>
+            <button type="submit" class="btn primary">Save profile</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- Estate ---------- -->
+  <div id="adminEstate" class="admin-panel hidden">
+    <div class="panel pad narrow">
+      <h3>Simulated estate</h3>
+      <p class="hint">
+        These values keep every generated record consistent, so a Windows logon,
+        a sudo call and an Nginx hit look like they came from the same
+        organisation. User and domain SIDs are derived from them, so an account
+        keeps the same SID across restarts.
+      </p>
+      <form id="envForm" class="form">
+        <div class="form-grid">
+          <label>AD domain<input id="ev_domain" placeholder="corp.local"></label>
+          <label>NetBIOS name<input id="ev_netbios" placeholder="CORP"></label>
+          <label>Windows host<input id="ev_winhost" placeholder="WIN-DC01"></label>
+          <label>Linux host<input id="ev_linuxhost" placeholder="ubuntu-app01"></label>
+          <label>Web host<input id="ev_webhost" placeholder="web-prod01"></label>
+          <label>Database host<input id="ev_dbhost" placeholder="oracle-db01"></label>
+          <label>Oracle SID / service<input id="ev_dbname" placeholder="ORCL"></label>
+          <label>Subnet prefix<input id="ev_subnet" placeholder="10.20.30"></label>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn primary">Save estate</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
 <!-- Control detail / preview drawer -->
 <div id="drawer" class="drawer hidden">
   <div class="drawer-head">
@@ -77,89 +268,6 @@
   <pre id="drawerWire" class="wire hidden"></pre>
 </div>
 
-<!-- Profiles modal -->
-<div id="profilesModal" class="modal hidden">
-  <div class="modal-box">
-    <div class="modal-head">
-      <h3>SIEM profiles</h3>
-      <button class="btn ghost small" data-close="profilesModal">Close</button>
-    </div>
-    <div id="profileList" class="profile-list"></div>
-    <hr>
-    <form id="profileForm" class="form">
-      <input type="hidden" id="pf_id">
-      <div class="form-grid">
-        <label>Name<input id="pf_name" required placeholder="Wazuh Manager (prod)"></label>
-        <label>Host<input id="pf_host" required placeholder="10.20.30.5"></label>
-        <label>Port<input id="pf_port" type="number" min="1" max="65535" value="514" required></label>
-        <label>Protocol
-          <select id="pf_protocol">
-            <option value="udp">UDP</option>
-            <option value="tcp">TCP</option>
-          </select>
-        </label>
-        <label>Syslog format
-          <select id="pf_format">
-            <option value="rfc3164">RFC 3164 (BSD)</option>
-            <option value="rfc5424">RFC 5424</option>
-            <option value="raw">Raw (no header)</option>
-          </select>
-        </label>
-        <label>TCP framing
-          <select id="pf_framing">
-            <option value="lf">Newline</option>
-            <option value="octet">Octet counting</option>
-          </select>
-        </label>
-        <label>Windows format
-          <select id="pf_winformat">
-            <option value="snare">Snare (MSWinEventLog)</option>
-            <option value="json">JSON (eventchannel)</option>
-          </select>
-        </label>
-        <label class="check">
-          <input type="checkbox" id="pf_webraw">
-          <span>Send web access logs without a syslog header</span>
-        </label>
-        <label class="check">
-          <input type="checkbox" id="pf_default">
-          <span>Use as default target</span>
-        </label>
-      </div>
-      <div class="form-actions">
-        <button type="button" id="pf_reset" class="btn ghost">New</button>
-        <button type="submit" class="btn primary">Save profile</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- Estate modal -->
-<div id="envModal" class="modal hidden">
-  <div class="modal-box">
-    <div class="modal-head">
-      <h3>Simulated estate</h3>
-      <button class="btn ghost small" data-close="envModal">Close</button>
-    </div>
-    <p class="hint">These values keep every generated record consistent — the same domain, hosts and subnet across Windows, Linux and web logs.</p>
-    <form id="envForm" class="form">
-      <div class="form-grid">
-        <label>AD domain<input id="ev_domain" placeholder="corp.local"></label>
-        <label>NetBIOS name<input id="ev_netbios" placeholder="CORP"></label>
-        <label>Windows host<input id="ev_winhost" placeholder="WIN-DC01"></label>
-        <label>Linux host<input id="ev_linuxhost" placeholder="ubuntu-app01"></label>
-        <label>Web host<input id="ev_webhost" placeholder="web-prod01"></label>
-        <label>Database host<input id="ev_dbhost" placeholder="oracle-db01"></label>
-        <label>Oracle SID / service<input id="ev_dbname" placeholder="ORCL"></label>
-        <label>Subnet prefix<input id="ev_subnet" placeholder="10.20.30"></label>
-      </div>
-      <div class="form-actions">
-        <button type="submit" class="btn primary">Save estate</button>
-      </div>
-    </form>
-  </div>
-</div>
-
 <footer class="credit">
   Built by <a href="https://www.heyshahrukh.me" target="_blank" rel="noopener noreferrer">Shahrukh Khan</a>
   · <a href="https://www.linkedin.com/in/shahrukh98khan" target="_blank" rel="noopener noreferrer">LinkedIn</a>
@@ -169,5 +277,6 @@
 <div id="toast" class="toast hidden"></div>
 
 <script src="app.js"></script>
+<script src="admin.js"></script>
 </body>
 </html>

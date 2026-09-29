@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -57,6 +58,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/profiles/{id}/default", s.handleSetDefault)
 	mux.HandleFunc("POST /api/profiles/{id}/test", s.handleTestProfile)
 
+	mux.HandleFunc("GET /api/customs", s.handleListCustoms)
+	mux.HandleFunc("POST /api/customs", s.handleCreateCustom)
+	mux.HandleFunc("PUT /api/customs/{id}", s.handleUpdateCustom)
+	mux.HandleFunc("DELETE /api/customs/{id}", s.handleDeleteCustom)
+	mux.HandleFunc("POST /api/preview-custom", s.handlePreviewCustom)
+	mux.HandleFunc("GET /api/sources", s.handleSources)
+	mux.HandleFunc("GET /api/placeholders", s.handlePlaceholders)
+
 	mux.HandleFunc("POST /api/preview", s.handlePreview)
 	mux.HandleFunc("POST /api/send", s.handleSend)
 
@@ -73,12 +82,54 @@ func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"env":      s.st.Env(),
 		"profiles": s.st.Profiles(),
-		"controls": catalog.Controls(),
+		"controls": s.allControls(),
+		"customs":  s.st.Customs(),
+		"sources":  s.sources(),
 	})
 }
 
 func (s *Server) handleControls(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, catalog.Controls())
+	writeJSON(w, http.StatusOK, s.allControls())
+}
+
+// allControls merges the compiled-in catalog with the operator's own controls.
+func (s *Server) allControls() []core.Control {
+	built := catalog.Controls()
+	customs := s.st.Customs()
+
+	out := make([]core.Control, 0, len(built)+len(customs))
+	out = append(out, built...)
+	for _, c := range customs {
+		out = append(out, c.Control())
+	}
+	return out
+}
+
+// resolve finds a control by ID, looking at the compiled-in catalog first so a
+// custom control can never shadow a built-in one.
+func (s *Server) resolve(id string) (core.Definition, bool) {
+	if def, ok := catalog.Get(id); ok {
+		return def, true
+	}
+	if cc, err := s.st.Custom(id); err == nil {
+		return core.Definition{Control: cc.Control(), Build: cc.Build}, true
+	}
+	return core.Definition{}, false
+}
+
+// sources lists every source that has at least one control, so the console can
+// offer them and the admin form can add to an existing one.
+func (s *Server) sources() []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, c := range s.allControls() {
+		if !seen[c.Source] {
+			seen[c.Source] = true
+			out = append(out, c.Source)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 func (s *Server) handleActivity(w http.ResponseWriter, r *http.Request) {
@@ -193,7 +244,7 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
-	def, ok := catalog.Get(req.ControlID)
+	def, ok := s.resolve(req.ControlID)
 	if !ok {
 		writeErr(w, http.StatusNotFound, fmt.Errorf("unknown control %q", req.ControlID))
 		return
@@ -220,7 +271,7 @@ func (s *Server) handleSend(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
-	def, ok := catalog.Get(req.ControlID)
+	def, ok := s.resolve(req.ControlID)
 	if !ok {
 		writeErr(w, http.StatusNotFound, fmt.Errorf("unknown control %q", req.ControlID))
 		return
@@ -334,6 +385,108 @@ func (s *Server) burst(def core.Definition, p core.Profile, params map[string]st
 			time.Sleep(time.Duration(delayMS) * time.Millisecond)
 		}
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Custom controls
+// ---------------------------------------------------------------------------
+
+func (s *Server) handleListCustoms(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, s.st.Customs())
+}
+
+// handlePreviewCustom renders a custom control that has not been saved, so the
+// operator can see the real wire format before committing it.
+func (s *Server) handlePreviewCustom(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Control   core.CustomControl `json:"control"`
+		ProfileID string             `json:"profileId"`
+		Params    map[string]string  `json:"params"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	if strings.TrimSpace(req.Control.Template) == "" {
+		writeErr(w, http.StatusBadRequest, errors.New("template is required"))
+		return
+	}
+
+	profile, err := s.st.Resolve(req.ProfileID)
+	if err != nil {
+		writeStoreErr(w, err)
+		return
+	}
+
+	cc := req.Control.Normalize()
+	payload := cc.Build(core.NewCtx(s.st.Env(), req.Params))
+	writeJSON(w, http.StatusOK, map[string]any{
+		"wire": sender.Encode(payload, profile, time.Now()),
+		"body": payload.Message,
+	})
+}
+
+func (s *Server) handleSources(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, s.sources())
+}
+
+func (s *Server) handlePlaceholders(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, core.Placeholders())
+}
+
+// builtinIDs is the set of compiled-in control IDs, which custom controls are
+// not allowed to reuse.
+func builtinIDs() map[string]bool {
+	out := map[string]bool{}
+	for _, c := range catalog.Controls() {
+		out[c.ID] = true
+	}
+	return out
+}
+
+func (s *Server) handleCreateCustom(w http.ResponseWriter, r *http.Request) {
+	var cc core.CustomControl
+	if !decode(w, r, &cc) {
+		return
+	}
+	if strings.TrimSpace(cc.Template) == "" {
+		writeErr(w, http.StatusBadRequest, errors.New("template is required"))
+		return
+	}
+	saved, err := s.st.CreateCustom(cc, builtinIDs())
+	if err != nil {
+		if errors.Is(err, store.ErrDuplicateID) {
+			writeErr(w, http.StatusConflict, err)
+			return
+		}
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, saved)
+}
+
+func (s *Server) handleUpdateCustom(w http.ResponseWriter, r *http.Request) {
+	var cc core.CustomControl
+	if !decode(w, r, &cc) {
+		return
+	}
+	if strings.TrimSpace(cc.Template) == "" {
+		writeErr(w, http.StatusBadRequest, errors.New("template is required"))
+		return
+	}
+	saved, err := s.st.UpdateCustom(r.PathValue("id"), cc)
+	if err != nil {
+		writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, saved)
+}
+
+func (s *Server) handleDeleteCustom(w http.ResponseWriter, r *http.Request) {
+	if err := s.st.DeleteCustom(r.PathValue("id")); err != nil {
+		writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 // ---------------------------------------------------------------------------

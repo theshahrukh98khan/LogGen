@@ -19,8 +19,9 @@ import (
 var ErrNotFound = errors.New("profile not found")
 
 type state struct {
-	Env      core.Env       `json:"env"`
-	Profiles []core.Profile `json:"profiles"`
+	Env      core.Env             `json:"env"`
+	Profiles []core.Profile       `json:"profiles"`
+	Customs  []core.CustomControl `json:"customs,omitempty"`
 }
 
 // Store is the on-disk configuration, guarded by a mutex.
@@ -55,6 +56,9 @@ func Open(path string) (*Store, error) {
 	s.st.Env = s.st.Env.Normalize()
 	for i := range s.st.Profiles {
 		s.st.Profiles[i] = s.st.Profiles[i].Normalize()
+	}
+	for i := range s.st.Customs {
+		s.st.Customs[i] = s.st.Customs[i].Normalize()
 	}
 	if len(s.st.Profiles) == 0 {
 		s.st.Profiles = []core.Profile{core.DefaultProfile()}
@@ -288,4 +292,98 @@ func newID(name string) string {
 		id = "profile"
 	}
 	return fmt.Sprintf("%s-%d", id, time.Now().UnixNano()%100000)
+}
+
+// ---------------------------------------------------------------------------
+// Custom controls
+// ---------------------------------------------------------------------------
+
+// ErrDuplicateID is returned when a custom control would collide with an
+// existing one, including a built-in.
+var ErrDuplicateID = errors.New("a control with that ID already exists")
+
+// Customs returns a copy of every operator-defined control.
+func (s *Store) Customs() []core.CustomControl {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]core.CustomControl, len(s.st.Customs))
+	copy(out, s.st.Customs)
+	return out
+}
+
+// Custom looks up one operator-defined control.
+func (s *Store) Custom(id string) (core.CustomControl, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, c := range s.st.Customs {
+		if c.ID == id {
+			return c, nil
+		}
+	}
+	return core.CustomControl{}, ErrNotFound
+}
+
+// CreateCustom adds a control. reserved lists IDs already taken by built-ins,
+// so a custom control can never shadow one.
+func (s *Store) CreateCustom(c core.CustomControl, reserved map[string]bool) (core.CustomControl, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	c = c.Normalize()
+	if strings.TrimSpace(c.ID) == "" {
+		c.ID = core.CustomID(c.Source, c.Name)
+	}
+	if reserved[c.ID] {
+		return c, ErrDuplicateID
+	}
+	for _, existing := range s.st.Customs {
+		if existing.ID == c.ID {
+			return c, ErrDuplicateID
+		}
+	}
+
+	s.st.Customs = append(s.st.Customs, c)
+	if err := s.save(); err != nil {
+		return c, err
+	}
+	return c, nil
+}
+
+// UpdateCustom replaces a control in place.
+func (s *Store) UpdateCustom(id string, c core.CustomControl) (core.CustomControl, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	idx := -1
+	for i := range s.st.Customs {
+		if s.st.Customs[i].ID == id {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return core.CustomControl{}, ErrNotFound
+	}
+
+	c.ID = id
+	c = c.Normalize()
+	s.st.Customs[idx] = c
+	if err := s.save(); err != nil {
+		return c, err
+	}
+	return c, nil
+}
+
+// DeleteCustom removes a control.
+func (s *Store) DeleteCustom(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for i := range s.st.Customs {
+		if s.st.Customs[i].ID == id {
+			s.st.Customs = append(s.st.Customs[:i], s.st.Customs[i+1:]...)
+			return s.save()
+		}
+	}
+	return ErrNotFound
 }
