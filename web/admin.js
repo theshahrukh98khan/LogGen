@@ -291,8 +291,6 @@ $('brandHome').onclick = (e) => {
   guard(() => showView('send'));
 };
 
-$('btnCloseAdmin').onclick = () => guard(() => showView('send'));
-
 document.querySelectorAll('#adminHub .tile').forEach((b) => {
   b.onclick = () => showAdminTab(b.dataset.admin);
 });

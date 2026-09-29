@@ -112,6 +112,27 @@ for (const [tile, panel, word] of [
   ck(`back returns to the hub from ${tile}`, await page.locator('#adminHub').isVisible());
 }
 
+// Administration has no global Done. Every card that can be edited saves
+// itself, so there is nothing left for one button at the top to mean.
+ck('there is no Done button', (await page.locator('#btnCloseAdmin').count()) === 0);
+
+for (const [tile, form, label] of [
+  ['profiles', '#profileForm', 'destination'],
+  ['customs', '#customForm', 'control'],
+  ['estate', '#envForm', 'estate'],
+]) {
+  await page.click(`[data-admin=${tile}]`);
+  await page.waitForTimeout(250);
+  const save = page.locator(`${form} button[type=submit]`);
+  ck(`the ${tile} card has its own save`, (await save.count()) === 1);
+  ck(`the ${tile} save is visible and named`,
+    (await save.isVisible()) &&
+    (await save.textContent()).toLowerCase().includes(label),
+    await save.textContent());
+  await page.click('#adminBack');
+  await page.waitForTimeout(250);
+}
+
 // Escape steps back one level rather than leaving administration entirely.
 await page.click('[data-admin=estate]');
 await page.waitForTimeout(250);
