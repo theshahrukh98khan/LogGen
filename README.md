@@ -121,6 +121,36 @@ the source: what `LENGTH` counts, which Oracle release introduced the
 Check against one real record from your own instance before relying on those
 fields.
 
+## Quick start
+
+One command builds LogGen, starts it with a local syslog sink, and points a
+destination at that sink, so records can be sent and seen without a SIEM:
+
+```powershell
+.\scripts\start.ps1 -WithSink
+```
+
+```sh
+./scripts/start.sh --with-sink
+```
+
+```
+LogGen
+  building v0.2.0
+  starting a syslog sink on :5514
+  destination 'Local sink' points at 127.0.0.1:5514
+  206 controls registered
+
+  http://127.0.0.1:8088  (this machine)
+  http://192.168.18.7:8088  (Wi-Fi)
+
+  records land in sink.log
+  stop with: Get-Process loggen | Stop-Process
+```
+
+Drop `-WithSink` to run against the destinations you have already configured,
+and pass `-Addr 127.0.0.1:8088` to keep the console off the network.
+
 ## Install
 
 LogGen is a single static binary with no runtime dependencies. It runs on
@@ -411,10 +441,12 @@ the collector.
 
 ### Sending
 
-- **Send** on a card puts one record on the wire. Clicking the card body opens
-  **Details** instead, where fields can be set and the exact wire format
-  previewed. Sending is never what a stray click does, because the destination
-  may be a production collector.
+- **Hover a card** to reveal its two actions. **Send** puts one record on the
+  wire; **Details** opens a drawer where fields can be set and the exact wire
+  format previewed. The card body itself does nothing, so neither sending nor
+  opening a panel is something a stray click can cause — which matters when the
+  destination may be a production collector. Keyboard focus reveals the same
+  actions.
 - **Recently sent** keeps the last few one click away, since the same records
   get fired repeatedly while a rule is being written.
 - **Repeat** emits up to 500 records at a set interval, reusing one connection

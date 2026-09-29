@@ -145,20 +145,20 @@ section('Sending');
 await page.fill('#search', '4625');
 await page.waitForTimeout(300);
 
-// Clicking the body opens the details; it must not send. This is the guard
-// against a stray click putting a record on a production collector.
+// The card body is inert: clicking it must neither send nor open anything.
+// This is the guard against a stray click reaching a production collector.
 const beforeBodyClick = await page.evaluate(async () =>
   (await (await fetch('/api/activity')).json()).length);
-await page.locator('.card').first().click();
-await page.waitForTimeout(1200);
+await page.locator('.card').first().locator('.card-id').click();
+await page.waitForTimeout(1000);
 ck('clicking a card does not send it',
   (await page.evaluate(async () =>
     (await (await fetch('/api/activity')).json()).length)) === beforeBodyClick);
-ck('clicking a card opens the details', await page.locator('#drawer').isVisible());
-await page.keyboard.press('Escape');
-await page.waitForTimeout(250);
+ck('clicking a card does not open a panel', !(await page.locator('#drawer').isVisible()));
 
-// Sending takes its own button.
+// Sending takes its own button, revealed on hover.
+await page.locator('.card').first().hover();
+await page.waitForTimeout(250);
 await page.locator('.card').first().locator('.card-send').click();
 await page.waitForTimeout(1300);
 
@@ -230,13 +230,20 @@ section('Details drawer');
 
 await page.fill('#search', 'kerberoast');
 await page.waitForTimeout(350);
-ck('both card actions are visible without hovering', await page.evaluate(() => {
-  const open = document.querySelector('.card .card-open');
-  const send = document.querySelector('.card .card-send');
-  const shown = (el) => el && getComputedStyle(el).display !== 'none' &&
-    parseFloat(getComputedStyle(el).opacity) > 0.5;
-  return shown(open) && shown(send);
+// The actions are revealed on hover, so a resting grid stays quiet and
+// neither button can be hit by accident.
+ck('card actions are hidden at rest', await page.evaluate(() =>
+  parseFloat(getComputedStyle(document.querySelector('.card-actions')).opacity) === 0));
+await page.locator('.card').first().hover();
+await page.waitForTimeout(300);
+ck('card actions appear on hover', await page.evaluate(() =>
+  parseFloat(getComputedStyle(document.querySelector('.card-actions')).opacity) === 1));
+ck('keyboard focus reveals them too', await page.evaluate(() => {
+  document.querySelector('.card').focus();
+  return parseFloat(getComputedStyle(document.querySelector('.card-actions')).opacity) === 1;
 }));
+await page.locator('.card').first().hover();
+await page.waitForTimeout(250);
 await page.locator('.card').first().locator('.card-open').click();
 await page.waitForTimeout(350);
 ck('the drawer opens', await page.locator('#drawer').isVisible());
@@ -293,6 +300,8 @@ ck('the new source appears in Send',
 await page.fill('#search', `Browser test ${stamp}`);
 await page.waitForTimeout(400);
 ck('the custom control is marked', (await page.locator('.card .tag.custom').count()) > 0);
+await page.locator('.card').first().hover();
+await page.waitForTimeout(250);
 await page.locator('.card').first().locator('.card-open').click();
 await page.waitForTimeout(300);
 await page.click('#drawerPreview');
