@@ -17,7 +17,7 @@ so it works with any collector that does.
 
 - Single static binary — runs on Linux, Windows and macOS, x86-64 and ARM64
 - No runtime dependencies, no third-party Go modules, no build step for the UI
-- 163 controls across Windows, Linux, Nginx, Apache and Oracle Database
+- 206 controls across Windows, Linux, web servers, Oracle, and five network security platforms
 - Multiple SIEM target profiles: host, port, TCP/UDP, syslog format
 - An Administration view for adding your own log sources and records
 - Every record shows you the exact bytes that went on the wire
@@ -36,6 +36,12 @@ a decoder that works here works on a live host.
 | **Nginx** | 20 | 16 access-log cases, 4 error-log cases |
 | **Apache** | 20 | the same 16 cases plus 4 error cases, in Apache's formats |
 | **Oracle** | 35 | Standard and unified audit trails, listener log, alert log |
+| **Palo Alto** | 8 | TRAFFIC, THREAT (vulnerability, virus, URL, WildFire), SYSTEM, CONFIG |
+| **FortiGate** | 9 | Traffic, IPS, antivirus, web filter, admin login, VPN, config change |
+| **Sophos** | 6 | Firewall rule, IPS, ATP, administration |
+| **Cisco ASA** | 10 | Connections, access lists, VPN, threat detection, administration |
+| **Cisco FTD** | 4 | Connection, intrusion and file events (430000 range) |
+| **Trend Micro** | 6 | Vision One Workbench alerts, OAT, detections, audit, response |
 
 Web cases cover normal traffic, 401/403/404/500, SQL injection, XSS, path
 traversal, command injection, Log4Shell, web shells, scanner user agents,
@@ -58,6 +64,27 @@ production.
 Field structures follow the
 [Ultimate Windows Security encyclopedia](https://www.ultimatewindowssecurity.com/securitylog/encyclopedia/default.aspx).
 </details>
+
+### Network security platforms
+
+These five are unforgiving in a way the text-based sources are not, so the
+formats are pinned by tests rather than trusted:
+
+| Platform | Shape | Why it breaks quietly |
+|---|---|---|
+| **Palo Alto** | positional CSV | A field in the wrong slot silently becomes the next field's meaning. TRAFFIC is 53 fields, THREAT is 60, and every `FUTURE_USE` placeholder is emitted so the positions after it stay correct. |
+| **FortiGate** | `key=value` | Order is not load bearing, but `logid` is ten digits and decoders key on the header set. |
+| **Sophos** | `key="value"` | `log_type`, `log_component` and `log_subtype` are what a decoder matches. |
+| **Cisco ASA / FTD** | `%ASA-<level>-<id>: <text>` | Each message ID has its own fixed sentence that decoders match literally. |
+| **Trend Micro** | CEF | Seven pipe-separated header fields; an unescaped pipe shifts every field after it. |
+
+The PAN-OS field orders are taken from the
+[PAN-OS 11.0 syslog field descriptions](https://docs.paloaltonetworks.com/pan-os/11-0/pan-os-admin/monitoring/use-syslog-for-monitoring/syslog-field-descriptions),
+and tests assert the exact field counts and the positions of Serial Number,
+Type, Action and Device Name, plus that the reserved slots are still empty.
+
+Trend Micro here is **Vision One**, the cloud XDR platform, not Deep Security or
+Apex One — those are different products with different formats.
 
 ### Oracle Database
 

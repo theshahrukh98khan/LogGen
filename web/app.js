@@ -246,6 +246,12 @@ const SOURCE_LABELS = {
   nginx: 'Nginx',
   apache: 'Apache',
   oracle: 'Oracle',
+  paloalto: 'Palo Alto',
+  fortigate: 'FortiGate',
+  sophos: 'Sophos',
+  'cisco-asa': 'Cisco ASA',
+  'cisco-ftd': 'Cisco FTD',
+  trendmicro: 'Trend Micro',
   diagnostics: 'Diagnostics',
 };
 
@@ -679,6 +685,10 @@ function fillEnvForm() {
   $('ev_dbhost').value = state.env.dbHost || '';
   $('ev_dbname').value = state.env.dbName || '';
   $('ev_subnet').value = state.env.subnet || '';
+  $('ev_fwhost').value = state.env.fwHost || '';
+  $('ev_fwserial').value = state.env.fwSerial || '';
+  $('ev_intiface').value = state.env.intIface || '';
+  $('ev_extiface').value = state.env.extIface || '';
 }
 
 // ---------------------------------------------------------------------------
@@ -730,6 +740,10 @@ $('envForm').onsubmit = async (e) => {
       dbHost: $('ev_dbhost').value,
       dbName: $('ev_dbname').value,
       subnet: $('ev_subnet').value,
+      fwHost: $('ev_fwhost').value,
+      fwSerial: $('ev_fwserial').value,
+      intIface: $('ev_intiface').value,
+      extIface: $('ev_extiface').value,
     });
     fillEnvForm();
     toast('Estate saved.', 'ok');

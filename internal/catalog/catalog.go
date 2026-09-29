@@ -71,8 +71,20 @@ func sourceRank(s string) int {
 		return 4
 	case core.SourceOracle:
 		return 5
-	default:
+	case core.SourcePaloAlto:
+		return 6
+	case core.SourceFortiGate:
+		return 7
+	case core.SourceSophos:
+		return 8
+	case core.SourceCiscoASA:
 		return 9
+	case core.SourceCiscoFTD:
+		return 10
+	case core.SourceTrendVision:
+		return 11
+	default:
+		return 20
 	}
 }
 
