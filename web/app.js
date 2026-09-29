@@ -229,7 +229,7 @@ function renderRecent() {
 // showView switches between sending and administration. Everything that is
 // configuration rather than simulation lives behind the one Administration
 // section, so the top level stays a choice between doing and setting up.
-function showView(view, adminTab) {
+function showView(view) {
   state.view = view;
   document.querySelectorAll('#mainNav .nav-item').forEach((b) =>
     b.classList.toggle('active', b.dataset.view === view));
@@ -240,7 +240,7 @@ function showView(view, adminTab) {
 
   if (!admin) return;
 
-  showAdminTab(adminTab || 'hub');
+  showAdminTab('hub');
   renderProfileList();
   renderCustomList();
   renderSourceOptions();
