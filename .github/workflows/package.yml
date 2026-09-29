@@ -59,7 +59,11 @@ jobs:
           echo "unauthenticated /api/controls: ${code}"
           test "${code}" = "401"
 
-          curl -sf -c jar.txt -X POST http://127.0.0.1:8099/api/auth/login             -H 'Content-Type: application/json'             -d '{"user":"admin","password":"admin"}' -o /dev/null
+          # A fresh data directory is always admin/admin, so the smoke test can
+          # sign in without knowing anything the image did not ship with.
+          curl -sf -c jar.txt -X POST http://127.0.0.1:8099/api/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"user":"admin","password":"admin"}' -o /dev/null
           curl -sf -b jar.txt http://127.0.0.1:8099/api/controls -o controls.json
 
           count=$(python3 -c "import json;print(len(json.load(open('controls.json'))))")
@@ -71,7 +75,7 @@ jobs:
 
           # Rendering must work inside the image. Preview renders a record
           # without needing a syslog target to exist.
-          curl -sf -X POST http://127.0.0.1:8099/api/preview \
+          curl -sf -b jar.txt -X POST http://127.0.0.1:8099/api/preview \
             -H 'Content-Type: application/json' \
             -d '{"controlId":"win-4625-logon-failed"}' -o preview.json
           python3 - <<'PY'
