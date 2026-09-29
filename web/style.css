@@ -52,6 +52,10 @@ html, body { height: 100%; }
 
 body {
   margin: 0;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   background: var(--ink);
   color: var(--text);
   font-family: var(--sans);
@@ -219,6 +223,7 @@ p { margin: 0; }
    --------------------------------------------------------------------------- */
 
 .readout {
+  flex: none;
   margin: 0 14px 12px;
   padding: 11px 12px 12px;
   border: 1px solid var(--line);
@@ -310,18 +315,38 @@ p { margin: 0; }
    --------------------------------------------------------------------------- */
 
 main {
+  flex: 1 1 auto;
   display: grid;
   grid-template-columns: 208px minmax(0, 1fr) minmax(300px, 368px);
-  align-items: start;
+  align-items: stretch;
+  min-height: 0;
 }
 
 @media (max-width: 1240px) {
   main { grid-template-columns: 180px minmax(0, 1fr); }
-  .activity { grid-column: 1 / -1; border-left: none; border-top: 1px solid var(--line); position: static; }
+  .controls { height: auto; }
+  .controls .grid { overflow: visible; }
+  .activity {
+    grid-column: 1 / -1;
+    border-left: none;
+    border-top: 1px solid var(--line);
+    position: static;
+    height: auto;
+  }
+  .activity-list { max-height: 420px; }
+}
+@media (max-width: 1240px) {
+  body { height: auto; overflow: visible; }
+  .rail { overflow: visible; }
 }
 @media (max-width: 760px) {
   main { grid-template-columns: minmax(0, 1fr); }
-  .rail { border-right: none; border-bottom: 1px solid var(--line); position: static; }
+  .rail {
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    position: static;
+    max-height: none;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -331,9 +356,7 @@ main {
 .rail {
   border-right: 1px solid var(--line);
   padding: 16px 0 24px;
-  position: sticky;
-  top: 0;
-  max-height: 100vh;
+  min-height: 0;
   overflow-y: auto;
   scrollbar-width: thin;
 }
@@ -383,7 +406,15 @@ main {
    Controls
    --------------------------------------------------------------------------- */
 
-.controls { min-width: 0; }
+.controls {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.controls .grid { flex: 1 1 auto; overflow-y: auto; align-content: start; scrollbar-width: thin; }
+.controls .grid::-webkit-scrollbar { width: 9px; }
+.controls .grid::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 4px; }
 
 .panel-head {
   display: flex;
@@ -575,18 +606,29 @@ main {
 .activity {
   border-left: 1px solid var(--line);
   min-width: 0;
-  position: sticky;
-  top: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .activity-list {
-  max-height: calc(100vh - 340px);
-  min-height: 120px;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   padding: 0 14px 20px;
   display: flex;
   flex-direction: column;
   gap: 7px;
+  scrollbar-width: thin;
+}
+.activity-list::-webkit-scrollbar { width: 8px; }
+.activity-list::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 4px; }
+
+/* An empty list should sit in the space rather than cling to the top of it. */
+.activity-list > .hint {
+  margin: auto;
+  padding: 0 8px;
+  text-align: center;
 }
 
 .act {
@@ -757,7 +799,16 @@ input:focus, select:focus, textarea:focus {
    Administration
    --------------------------------------------------------------------------- */
 
-.admin { padding: 18px 20px 28px; display: flex; flex-direction: column; gap: 16px; }
+.admin {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 20px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  scrollbar-width: thin;
+}
 
 .admin-head {
   display: flex; align-items: flex-start; justify-content: space-between;
@@ -884,7 +935,8 @@ input:focus, select:focus, textarea:focus {
 .toast.bad { border-left-color: var(--sev-high); }
 
 .credit {
-  padding: 16px 20px 26px;
+  flex: none;
+  padding: 10px 20px 11px;
   font-family: var(--mono);
   font-size: 10.5px;
   letter-spacing: .04em;
