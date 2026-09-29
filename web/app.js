@@ -672,7 +672,7 @@ function renderProfileList() {
         <button class="btn ghost small danger" data-act="delete">Delete</button>
       </div>`;
 
-    row.querySelector('[data-act=edit]').onclick = () => fillProfileForm(p);
+    row.querySelector('[data-act=edit]').onclick = () => guard(() => fillProfileForm(p));
     row.querySelector('[data-act=default]').onclick = async () => {
       try {
         state.profiles = await api('POST', `/api/profiles/${p.id}/default`);
@@ -704,6 +704,7 @@ function fillProfileForm(p) {
   $('pf_winformat').value = p ? p.winFormat : 'snare';
   $('pf_webraw').checked = p ? !!p.webRaw : false;
   $('pf_default').checked = p ? !!p.isDefault : false;
+  markClean('profileForm');
 }
 
 function readProfileForm() {
@@ -737,7 +738,116 @@ function fillEnvForm() {
   $('ev_fwserial').value = state.env.fwSerial || '';
   $('ev_intiface').value = state.env.intIface || '';
   $('ev_extiface').value = state.env.extIface || '';
+  markClean('envForm');
 }
+
+// ---------------------------------------------------------------------------
+// Unsaved changes
+//
+// Every editable panel is a form that only reaches the server on submit, so
+// navigating away silently threw the edits out. Each guarded form carries a
+// snapshot of its values taken when it was last filled or saved; anything that
+// no longer matches is unsaved work, and the operator is asked before it goes.
+// ---------------------------------------------------------------------------
+
+const GUARDED = [
+  { panel: 'adminProfiles', form: 'profileForm', what: 'this destination' },
+  { panel: 'adminCustoms', form: 'customForm', what: 'this control' },
+  { panel: 'adminEstate', form: 'envForm', what: 'the simulated estate' },
+];
+
+// snapshot serialises a form, including fields added after load such as the
+// custom control's parameter rows.
+function snapshot(form) {
+  return JSON.stringify([...form.elements].map((el) =>
+    el.type === 'checkbox' || el.type === 'radio' ? el.checked : el.value));
+}
+
+// markClean records the current values as the saved state.
+function markClean(id) {
+  const form = $(id);
+  if (form) form.dataset.clean = snapshot(form);
+}
+
+function isDirty(id) {
+  const form = $(id);
+  if (!form || form.dataset.clean === undefined) return false;
+  return form.dataset.clean !== snapshot(form);
+}
+
+// pendingEdit returns the guarded form on screen with unsaved changes, if any.
+// Only the visible panel counts: a form behind a hidden panel was already left
+// through this same guard.
+function pendingEdit() {
+  if (state.view !== 'admin') return null;
+  return GUARDED.find((g) =>
+    !$(g.panel).classList.contains('hidden') && isDirty(g.form)) || null;
+}
+
+// askToLeave resolves to 'save', 'discard' or 'cancel'.
+function askToLeave(what) {
+  return new Promise((resolve) => {
+    const box = $('leaveGuard');
+    $('leaveBody').textContent =
+      `Your changes to ${what} have not been saved. Saving keeps them; ` +
+      `discarding returns the form to the last saved values.`;
+    box.classList.remove('hidden');
+
+    const done = (answer) => {
+      box.classList.add('hidden');
+      document.removeEventListener('keydown', onKey, true);
+      resolve(answer);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done('cancel'); }
+    };
+
+    $('leaveSave').onclick = () => done('save');
+    $('leaveDiscard').onclick = () => done('discard');
+    $('leaveCancel').onclick = () => done('cancel');
+    // A click on the backdrop is the same as cancelling: it is the answer that
+    // cannot lose anything.
+    box.onclick = (e) => { if (e.target === box) done('cancel'); };
+    document.addEventListener('keydown', onKey, true);
+    $('leaveCancel').focus();
+  });
+}
+
+// guard runs an action, asking first when it would discard unsaved edits.
+// Returns false when the operator chose to stay.
+async function guard(action) {
+  const pending = pendingEdit();
+  if (!pending) { await action(); return true; }
+
+  const answer = await askToLeave(pending.what);
+  if (answer === 'cancel') return false;
+
+  if (answer === 'save') {
+    const form = $(pending.form);
+    // requestSubmit runs validation and the submit handler, so a form that is
+    // not valid keeps the operator where they are rather than losing the edit.
+    if (!form.reportValidity()) return false;
+    form.requestSubmit();
+    // The handlers are async; wait for the save to mark the form clean before
+    // navigating, and stay put if it failed.
+    for (let i = 0; i < 40 && isDirty(pending.form); i++) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    if (isDirty(pending.form)) {
+      toast('Could not save, so nothing was navigated away from.', 'bad');
+      return false;
+    }
+  }
+
+  await action();
+  return true;
+}
+
+// A reload or a closed tab bypasses every in-page handler, so the browser's own
+// prompt is the only thing left. It cannot be worded or styled.
+window.addEventListener('beforeunload', (e) => {
+  if (pendingEdit()) { e.preventDefault(); e.returnValue = ''; }
+});
 
 // ---------------------------------------------------------------------------
 // Wiring
@@ -761,7 +871,7 @@ $('btnTest').onclick = async () => {
 // Profiles and the estate now live in the Administration view; admin.js wires
 // the button that opens it.
 
-$('pf_reset').onclick = () => fillProfileForm(null);
+$('pf_reset').onclick = () => guard(() => fillProfileForm(null));
 
 $('profileForm').onsubmit = async (e) => {
   e.preventDefault();
@@ -772,6 +882,7 @@ $('profileForm').onsubmit = async (e) => {
     else await api('POST', '/api/profiles', body);
     state.profiles = await api('GET', '/api/profiles');
     renderProfileSelect(); renderProfileList();
+    markClean('profileForm');
     toast('Profile saved.', 'ok');
   } catch (err) { toast(err.message, 'bad'); }
 };
