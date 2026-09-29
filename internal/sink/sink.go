@@ -1,5 +1,5 @@
 // Package sink is a minimal syslog receiver. It exists so the send pipeline can
-// be verified locally, before pointing LogSource at a real Wazuh manager.
+// be verified locally, before pointing LogGen at a real Wazuh manager.
 package sink
 
 import (

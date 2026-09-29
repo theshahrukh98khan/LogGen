@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"socbyte.ai/logsource/internal/core"
+	"github.com/theshahrukh98khan/LogGen/internal/core"
 )
 
 // ErrNotFound is returned when a profile ID does not exist.

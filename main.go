@@ -1,4 +1,4 @@
-// Command logsource is a log simulation lab: it generates correctly structured
+// Command loggen is a log simulation lab: it generates correctly structured
 // records for common log sources and ships them to a SIEM over syslog, so
 // parsers, decoders and detection rules can be exercised without a real estate.
 package main
@@ -15,10 +15,10 @@ import (
 	"runtime"
 	"time"
 
-	"socbyte.ai/logsource/internal/catalog"
-	"socbyte.ai/logsource/internal/server"
-	"socbyte.ai/logsource/internal/sink"
-	"socbyte.ai/logsource/internal/store"
+	"github.com/theshahrukh98khan/LogGen/internal/catalog"
+	"github.com/theshahrukh98khan/LogGen/internal/server"
+	"github.com/theshahrukh98khan/LogGen/internal/sink"
+	"github.com/theshahrukh98khan/LogGen/internal/store"
 )
 
 //go:embed all:web
@@ -63,7 +63,7 @@ func main() {
 	if def, err := st.Default(); err == nil {
 		log.Printf("default target: %s://%s (%s)", def.Protocol, def.Addr(), def.Name)
 	}
-	log.Print("LogSource console reachable at:")
+	log.Print("LogGen console reachable at:")
 	for _, u := range urls {
 		log.Printf("    %s", u)
 	}

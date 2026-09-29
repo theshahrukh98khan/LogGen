@@ -1,6 +1,6 @@
 # build output
-logsource
-logsource.exe
+loggen
+loggen.exe
 *.exe
 
 # runtime config, machine specific
