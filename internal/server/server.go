@@ -1,0 +1,402 @@
+// Package server exposes the HTTP API and serves the operator console.
+package server
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/fs"
+	"log"
+	"net/http"
+	"strings"
+	"sync"
+	"time"
+
+	"socbyte.ai/logsource/internal/catalog"
+	"socbyte.ai/logsource/internal/core"
+	"socbyte.ai/logsource/internal/sender"
+	"socbyte.ai/logsource/internal/store"
+)
+
+// maxBurst caps how many records a single request may emit, so a stray zero in
+// the UI cannot flood the SIEM.
+const maxBurst = 500
+
+// activityCap is the size of the in-memory send history.
+const activityCap = 400
+
+// Server wires the store, the catalog and the web console together.
+type Server struct {
+	st  *store.Store
+	web fs.FS
+
+	mu     sync.Mutex
+	recent []core.Activity
+}
+
+// New builds a server. webFS should contain index.html at its root.
+func New(st *store.Store, webFS fs.FS) *Server {
+	return &Server{st: st, web: webFS}
+}
+
+// Handler returns the fully routed HTTP handler.
+func (s *Server) Handler() http.Handler {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("GET /api/state", s.handleState)
+	mux.HandleFunc("GET /api/controls", s.handleControls)
+	mux.HandleFunc("GET /api/activity", s.handleActivity)
+
+	mux.HandleFunc("PUT /api/env", s.handleSetEnv)
+
+	mux.HandleFunc("GET /api/profiles", s.handleListProfiles)
+	mux.HandleFunc("POST /api/profiles", s.handleCreateProfile)
+	mux.HandleFunc("PUT /api/profiles/{id}", s.handleUpdateProfile)
+	mux.HandleFunc("DELETE /api/profiles/{id}", s.handleDeleteProfile)
+	mux.HandleFunc("POST /api/profiles/{id}/default", s.handleSetDefault)
+	mux.HandleFunc("POST /api/profiles/{id}/test", s.handleTestProfile)
+
+	mux.HandleFunc("POST /api/preview", s.handlePreview)
+	mux.HandleFunc("POST /api/send", s.handleSend)
+
+	mux.Handle("/", http.FileServer(http.FS(s.web)))
+
+	return logRequests(mux)
+}
+
+// ---------------------------------------------------------------------------
+// Read handlers
+// ---------------------------------------------------------------------------
+
+func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{
+		"env":      s.st.Env(),
+		"profiles": s.st.Profiles(),
+		"controls": catalog.Controls(),
+	})
+}
+
+func (s *Server) handleControls(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, catalog.Controls())
+}
+
+func (s *Server) handleActivity(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, s.activity())
+}
+
+func (s *Server) handleListProfiles(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, s.st.Profiles())
+}
+
+// ---------------------------------------------------------------------------
+// Configuration handlers
+// ---------------------------------------------------------------------------
+
+func (s *Server) handleSetEnv(w http.ResponseWriter, r *http.Request) {
+	var env core.Env
+	if !decode(w, r, &env) {
+		return
+	}
+	saved, err := s.st.SetEnv(env)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, saved)
+}
+
+func (s *Server) handleCreateProfile(w http.ResponseWriter, r *http.Request) {
+	var p core.Profile
+	if !decode(w, r, &p) {
+		return
+	}
+	saved, err := s.st.Create(p)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, saved)
+}
+
+func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
+	var p core.Profile
+	if !decode(w, r, &p) {
+		return
+	}
+	saved, err := s.st.Update(r.PathValue("id"), p)
+	if err != nil {
+		writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, saved)
+}
+
+func (s *Server) handleDeleteProfile(w http.ResponseWriter, r *http.Request) {
+	if err := s.st.Delete(r.PathValue("id")); err != nil {
+		writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func (s *Server) handleSetDefault(w http.ResponseWriter, r *http.Request) {
+	if err := s.st.SetDefault(r.PathValue("id")); err != nil {
+		writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, s.st.Profiles())
+}
+
+// handleTestProfile opens a connection to the target without sending a record.
+func (s *Server) handleTestProfile(w http.ResponseWriter, r *http.Request) {
+	p, err := s.st.Profile(r.PathValue("id"))
+	if err != nil {
+		writeStoreErr(w, err)
+		return
+	}
+	if err := sender.Probe(p); err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok":     false,
+			"target": p.Protocol + "://" + p.Addr(),
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	note := "Connected."
+	if p.Protocol == core.ProtoUDP {
+		note = "Socket opened. UDP is connectionless, so this does not prove the SIEM is listening — send a heartbeat and confirm it arrives."
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":     true,
+		"target": p.Protocol + "://" + p.Addr(),
+		"note":   note,
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Simulation handlers
+// ---------------------------------------------------------------------------
+
+type simRequest struct {
+	ControlID string            `json:"controlId"`
+	ProfileID string            `json:"profileId"`
+	Params    map[string]string `json:"params"`
+	Count     int               `json:"count"`
+	DelayMS   int               `json:"delayMs"`
+}
+
+// handlePreview renders a control without sending it.
+func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
+	var req simRequest
+	if !decode(w, r, &req) {
+		return
+	}
+	def, ok := catalog.Get(req.ControlID)
+	if !ok {
+		writeErr(w, http.StatusNotFound, fmt.Errorf("unknown control %q", req.ControlID))
+		return
+	}
+	profile, err := s.st.Resolve(req.ProfileID)
+	if err != nil {
+		writeStoreErr(w, err)
+		return
+	}
+
+	now := time.Now()
+	payload := def.Build(core.NewCtx(s.st.Env(), req.Params))
+	writeJSON(w, http.StatusOK, map[string]any{
+		"control": def.Control,
+		"target":  profile.Protocol + "://" + profile.Addr(),
+		"wire":    sender.Encode(payload, profile, now),
+		"body":    payload.Message,
+	})
+}
+
+// handleSend renders a control and ships it to the target.
+func (s *Server) handleSend(w http.ResponseWriter, r *http.Request) {
+	var req simRequest
+	if !decode(w, r, &req) {
+		return
+	}
+	def, ok := catalog.Get(req.ControlID)
+	if !ok {
+		writeErr(w, http.StatusNotFound, fmt.Errorf("unknown control %q", req.ControlID))
+		return
+	}
+	profile, err := s.st.Resolve(req.ProfileID)
+	if err != nil {
+		writeStoreErr(w, err)
+		return
+	}
+
+	count := req.Count
+	if count < 1 {
+		count = 1
+	}
+	if count > maxBurst {
+		count = maxBurst
+	}
+
+	// A single record is sent inline so the console gets an immediate verdict.
+	// Bursts run in the background and surface through the activity feed.
+	if count == 1 {
+		act := s.emit(def, profile, req.Params)
+		status := http.StatusOK
+		if !act.OK {
+			status = http.StatusBadGateway
+		}
+		writeJSON(w, status, act)
+		return
+	}
+
+	go s.burst(def, profile, req.Params, count, req.DelayMS)
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"queued":  count,
+		"control": def.Name,
+		"target":  profile.Protocol + "://" + profile.Addr(),
+	})
+}
+
+// emit renders and sends one record, recording the outcome.
+func (s *Server) emit(def core.Definition, p core.Profile, params map[string]string) core.Activity {
+	now := time.Now()
+	payload := def.Build(core.NewCtx(s.st.Env(), params))
+	wire := sender.Encode(payload, p, now)
+
+	act := core.Activity{
+		Time:      now,
+		ControlID: def.ID,
+		Control:   def.Name,
+		Source:    def.Source,
+		Profile:   p.Name,
+		Target:    p.Protocol + "://" + p.Addr(),
+		Wire:      wire,
+	}
+	n, err := sender.SendOne(p, wire)
+	if err != nil {
+		act.Error = err.Error()
+	} else {
+		act.OK = true
+		act.Bytes = n
+	}
+	s.record(act)
+	return act
+}
+
+// burst reuses one connection for the whole run, which matters for TCP.
+func (s *Server) burst(def core.Definition, p core.Profile, params map[string]string, count, delayMS int) {
+	conn, err := sender.Open(p)
+	if err != nil {
+		s.record(core.Activity{
+			Time:      time.Now(),
+			ControlID: def.ID,
+			Control:   def.Name,
+			Source:    def.Source,
+			Profile:   p.Name,
+			Target:    p.Protocol + "://" + p.Addr(),
+			Error:     err.Error(),
+		})
+		return
+	}
+	defer conn.Close()
+
+	if delayMS < 0 {
+		delayMS = 0
+	}
+	for i := 0; i < count; i++ {
+		now := time.Now()
+		// Rebuild per iteration so each record gets fresh randomised fields.
+		payload := def.Build(core.NewCtx(s.st.Env(), params))
+		wire := sender.Encode(payload, p, now)
+
+		act := core.Activity{
+			Time:      now,
+			ControlID: def.ID,
+			Control:   fmt.Sprintf("%s (%d/%d)", def.Name, i+1, count),
+			Source:    def.Source,
+			Profile:   p.Name,
+			Target:    p.Protocol + "://" + p.Addr(),
+			Wire:      wire,
+		}
+		n, werr := conn.Write(wire)
+		if werr != nil {
+			act.Error = werr.Error()
+			s.record(act)
+			return // the connection is broken; stop rather than spin
+		}
+		act.OK = true
+		act.Bytes = n
+		s.record(act)
+
+		if delayMS > 0 && i < count-1 {
+			time.Sleep(time.Duration(delayMS) * time.Millisecond)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Activity ring buffer
+// ---------------------------------------------------------------------------
+
+func (s *Server) record(a core.Activity) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.recent = append(s.recent, a)
+	if len(s.recent) > activityCap {
+		s.recent = s.recent[len(s.recent)-activityCap:]
+	}
+}
+
+// activity returns the history newest first.
+func (s *Server) activity() []core.Activity {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]core.Activity, len(s.recent))
+	for i, a := range s.recent {
+		out[len(s.recent)-1-i] = a
+	}
+	return out
+}
+
+// ---------------------------------------------------------------------------
+// HTTP helpers
+// ---------------------------------------------------------------------------
+
+func decode(w http.ResponseWriter, r *http.Request, dst any) bool {
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
+	if err := dec.Decode(dst); err != nil {
+		writeErr(w, http.StatusBadRequest, fmt.Errorf("invalid request body: %w", err))
+		return false
+	}
+	return true
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		log.Printf("write response: %v", err)
+	}
+}
+
+func writeErr(w http.ResponseWriter, status int, err error) {
+	writeJSON(w, status, map[string]any{"error": err.Error()})
+}
+
+func writeStoreErr(w http.ResponseWriter, err error) {
+	if errors.Is(err, store.ErrNotFound) {
+		writeErr(w, http.StatusNotFound, err)
+		return
+	}
+	writeErr(w, http.StatusBadRequest, err)
+}
+
+func logRequests(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			log.Printf("%s %s", r.Method, r.URL.Path)
+		}
+		next.ServeHTTP(w, r)
+	})
+}

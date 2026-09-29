@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LogSource</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">LS</span>
+    <div>
+      <h1>LogSource</h1>
+      <p class="sub">Wazuh log-onboarding &amp; detection-testing lab</p>
+    </div>
+  </div>
+
+  <div class="target">
+    <label for="profileSelect">Target</label>
+    <select id="profileSelect"></select>
+    <span id="targetAddr" class="addr"></span>
+    <button id="btnTest" class="btn ghost">Test</button>
+    <button id="btnProfiles" class="btn ghost">Profiles</button>
+    <button id="btnEnv" class="btn ghost">Estate</button>
+  </div>
+</header>
+
+<main>
+  <section class="panel controls">
+    <div class="panel-head">
+      <h2>Controls</h2>
+      <div class="filters">
+        <input id="search" type="search" placeholder="Search controls, event IDs, techniques…">
+        <label class="burst">
+          Burst
+          <input id="burstCount" type="number" min="1" max="500" value="1">
+        </label>
+        <label class="burst">
+          Delay ms
+          <input id="burstDelay" type="number" min="0" max="10000" value="200">
+        </label>
+      </div>
+    </div>
+    <div id="sourceTabs" class="tabs"></div>
+    <div id="controlGrid" class="grid"></div>
+    <p id="emptyHint" class="hint hidden"></p>
+  </section>
+
+  <section class="panel activity">
+    <div class="panel-head">
+      <h2>Activity</h2>
+      <button id="btnClearActivity" class="btn ghost small">Clear view</button>
+    </div>
+    <div id="activityList" class="activity-list">
+      <p class="hint">Nothing sent yet. Click a control to emit a record.</p>
+    </div>
+  </section>
+</main>
+
+<!-- Control detail / preview drawer -->
+<div id="drawer" class="drawer hidden">
+  <div class="drawer-head">
+    <div>
+      <h3 id="drawerTitle"></h3>
+      <p id="drawerDesc" class="sub"></p>
+    </div>
+    <button id="drawerClose" class="btn ghost small">Close</button>
+  </div>
+  <div id="drawerMeta" class="meta-row"></div>
+  <div id="drawerParams" class="params"></div>
+  <div class="drawer-actions">
+    <button id="drawerPreview" class="btn ghost">Preview</button>
+    <button id="drawerSend" class="btn primary">Send</button>
+  </div>
+  <pre id="drawerWire" class="wire hidden"></pre>
+</div>
+
+<!-- Profiles modal -->
+<div id="profilesModal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>SIEM profiles</h3>
+      <button class="btn ghost small" data-close="profilesModal">Close</button>
+    </div>
+    <div id="profileList" class="profile-list"></div>
+    <hr>
+    <form id="profileForm" class="form">
+      <input type="hidden" id="pf_id">
+      <div class="form-grid">
+        <label>Name<input id="pf_name" required placeholder="Wazuh Manager (prod)"></label>
+        <label>Host<input id="pf_host" required placeholder="10.20.30.5"></label>
+        <label>Port<input id="pf_port" type="number" min="1" max="65535" value="514" required></label>
+        <label>Protocol
+          <select id="pf_protocol">
+            <option value="udp">UDP</option>
+            <option value="tcp">TCP</option>
+          </select>
+        </label>
+        <label>Syslog format
+          <select id="pf_format">
+            <option value="rfc3164">RFC 3164 (BSD)</option>
+            <option value="rfc5424">RFC 5424</option>
+            <option value="raw">Raw (no header)</option>
+          </select>
+        </label>
+        <label>TCP framing
+          <select id="pf_framing">
+            <option value="lf">Newline</option>
+            <option value="octet">Octet counting</option>
+          </select>
+        </label>
+        <label>Windows format
+          <select id="pf_winformat">
+            <option value="snare">Snare (MSWinEventLog)</option>
+            <option value="json">JSON (eventchannel)</option>
+          </select>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="pf_webraw">
+          <span>Send web access logs without a syslog header</span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="pf_default">
+          <span>Use as default target</span>
+        </label>
+      </div>
+      <div class="form-actions">
+        <button type="button" id="pf_reset" class="btn ghost">New</button>
+        <button type="submit" class="btn primary">Save profile</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Estate modal -->
+<div id="envModal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>Simulated estate</h3>
+      <button class="btn ghost small" data-close="envModal">Close</button>
+    </div>
+    <p class="hint">These values keep every generated record consistent — the same domain, hosts and subnet across Windows, Linux and web logs.</p>
+    <form id="envForm" class="form">
+      <div class="form-grid">
+        <label>AD domain<input id="ev_domain" placeholder="socbyte.local"></label>
+        <label>NetBIOS name<input id="ev_netbios" placeholder="SOCBYTE"></label>
+        <label>Windows host<input id="ev_winhost" placeholder="WIN-DC01"></label>
+        <label>Linux host<input id="ev_linuxhost" placeholder="ubuntu-app01"></label>
+        <label>Web host<input id="ev_webhost" placeholder="web-prod01"></label>
+        <label>Subnet prefix<input id="ev_subnet" placeholder="10.20.30"></label>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn primary">Save estate</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
