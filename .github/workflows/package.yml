@@ -1,0 +1,119 @@
+name: Package
+
+# Publishes the container image to GitHub Packages (ghcr.io).
+#
+#   main      -> ghcr.io/<owner>/loggen:edge
+#   v1.2.3    -> ghcr.io/<owner>/loggen:1.2.3, :1.2, :latest
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ${{ github.repository_owner }}/loggen
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Build for this runner only, load it locally, and prove it actually
+      # works before anything is published.
+      - name: Build image for smoke test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: loggen:smoketest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test the image
+        run: |
+          set -euo pipefail
+          docker run -d --name loggen-test -p 127.0.0.1:8099:8088 loggen:smoketest
+
+          # Wait for the console to answer.
+          for i in $(seq 1 30); do
+            sleep 1
+            if curl -sf http://127.0.0.1:8099/api/controls -o controls.json; then break; fi
+          done
+
+          count=$(python3 -c "import json;print(len(json.load(open('controls.json'))))")
+          echo "controls served by the image: $count"
+          test "$count" -ge 100
+
+          # The console itself must be served, not just the API.
+          curl -sf http://127.0.0.1:8099/ | grep -q "LogGen"
+
+          # Rendering must work inside the image. Preview renders a record
+          # without needing a syslog target to exist.
+          curl -sf -X POST http://127.0.0.1:8099/api/preview \
+            -H 'Content-Type: application/json' \
+            -d '{"controlId":"win-4625-logon-failed"}' -o preview.json
+          python3 - <<'PY'
+          import json
+          wire = json.load(open("preview.json"))["wire"]
+          assert "MSWinEventLog" in wire, wire[:200]
+          assert len(wire.split("\t")) == 15, f"{len(wire.split(chr(9)))} fields"
+          print("rendered record OK:", wire[:90])
+          PY
+
+          # The container must not run as root.
+          user=$(docker inspect --format '{{.Config.User}}' loggen-test)
+          echo "image user: ${user}"
+          test "${user}" = "nonroot:nonroot"
+
+          docker logs loggen-test
+          docker rm -f loggen-test
+
+      - name: Report image size
+        run: docker image ls loggen:smoketest --format '{{.Repository}}:{{.Tag}}  {{.Size}}'
+
+      - name: Log in to GitHub Packages
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive image tags
+        if: github.event_name != 'pull_request'
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=edge,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+          labels: |
+            org.opencontainers.image.title=LogGen
+            org.opencontainers.image.description=Log simulation lab for SIEM onboarding and detection-rule testing
+            org.opencontainers.image.licenses=MIT
+
+      - name: Build and publish
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

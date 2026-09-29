@@ -126,6 +126,30 @@ Install Go with `winget install GoLang.Go` or from
 whether to allow the console to accept connections — allow it on **private
 networks only**, or decline and reach it at `http://127.0.0.1:8088`.
 
+### Docker
+
+A container image is published to GitHub Packages on every release:
+
+```sh
+docker run --rm -p 127.0.0.1:8088:8088 -v loggen-data:/data \
+  ghcr.io/theshahrukh98khan/loggen:latest
+```
+
+Then open <http://127.0.0.1:8088>. The named volume keeps your profiles and
+estate between runs. Tags are `latest` and the version for releases, and `edge`
+for the current `main`.
+
+The image is built from `scratch`-style distroless with a static binary: no
+shell, no package manager, and it runs as a non-root user. Publishing the port
+to `127.0.0.1` rather than `0.0.0.0` keeps the unauthenticated console off the
+network.
+
+To build it yourself:
+
+```sh
+docker build -t loggen .
+```
+
 ### Cross-compiling
 
 The build is pure Go, so one machine can produce binaries for every platform:
