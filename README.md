@@ -410,13 +410,20 @@ so in a comment rather than guessing — there are several such notes already in
 Before opening a pull request:
 
 ```sh
-gofmt -l .      # must print nothing
+gofmt -l .           # must print nothing
 go vet ./...
-go build ./...
+go test ./...        # or: make test
+go test ./... -race  # needs a C toolchain
 ```
 
-CI runs those on every push, cross-compiles for four platforms, and starts the
-binary to confirm the catalog still registers cleanly.
+CI runs all of those on every push, cross-compiles for four platforms, and
+starts the binary to confirm the catalog still registers cleanly.
+
+The test suite renders every control and checks that none produces an empty
+record or an unresolved format verb, that Snare records keep their fifteen
+fields, that the Windows JSON envelope parses, and that a value appearing in a
+Windows record's description also appears in its structured fields — a
+generator called twice would silently break any rule correlating the two.
 
 ## License
 

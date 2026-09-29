@@ -316,6 +316,10 @@ type Definition struct {
 
 // Activity is one send attempt, kept in a ring buffer for the UI.
 type Activity struct {
+	// Seq increases monotonically for the life of the process. The console uses
+	// it to append only what is new, instead of rebuilding the whole feed on
+	// every poll, which would discard any text the operator had selected.
+	Seq       uint64    `json:"seq"`
 	Time      time.Time `json:"time"`
 	ControlID string    `json:"controlId"`
 	Control   string    `json:"control"`
