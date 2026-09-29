@@ -346,8 +346,7 @@ func (s *Server) emit(def core.Definition, p core.Profile, params map[string]str
 		act.OK = true
 		act.Bytes = n
 	}
-	s.record(act)
-	return act
+	return s.record(act)
 }
 
 // burst reuses one connection for the whole run, which matters for TCP.
@@ -507,7 +506,13 @@ func (s *Server) handleDeleteCustom(w http.ResponseWriter, r *http.Request) {
 // Activity ring buffer
 // ---------------------------------------------------------------------------
 
-func (s *Server) record(a core.Activity) {
+// record stamps an entry with the next sequence number, stores it, and returns
+// the stored form.
+//
+// It returns the entry rather than mutating the caller's copy because the
+// caller needs the sequence too: a send response that reported seq 0 while the
+// feed showed the real number made the two impossible to correlate.
+func (s *Server) record(a core.Activity) core.Activity {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.seq++
@@ -516,6 +521,7 @@ func (s *Server) record(a core.Activity) {
 	if len(s.recent) > activityCap {
 		s.recent = s.recent[len(s.recent)-activityCap:]
 	}
+	return a
 }
 
 // activity returns the history newest first.
