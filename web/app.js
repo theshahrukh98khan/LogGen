@@ -10,7 +10,6 @@ const state = {
   active: null,   // control currently open in the drawer
   lastSeq: 0,     // newest activity sequence number already rendered
   view: 'send',   // send | targets | library
-  recent: [],     // ids of controls sent lately, newest first
   customs: [],    // operator-defined controls
   sources: [],    // every source that has at least one control
   placeholders: [],
@@ -69,11 +68,9 @@ async function boot() {
     toast(`Could not load state: ${err.message}`, 'bad');
     return;
   }
-  loadRecent();
   renderProfileSelect();
   renderTabs();
   renderGrid();
-  renderRecent();
   checkTarget();
   buildFacilitySelects();
   renderPlaceholders();
@@ -208,47 +205,6 @@ function connectAdvice(res, profile) {
       `between is dropping it: check a firewall or port forward.`;
   }
   return `${where}the connection to ${port} failed. ${res.error || ''}`.trim();
-}
-
-// ---------------------------------------------------------------------------
-// Recently sent
-// ---------------------------------------------------------------------------
-
-// The same few records get fired over and over while a rule is being written,
-// so the last handful stay one click away.
-function loadRecent() {
-  try {
-    state.recent = JSON.parse(localStorage.getItem('loggen.recent') || '[]');
-  } catch { state.recent = []; }
-}
-
-function rememberRecent(id) {
-  state.recent = [id, ...state.recent.filter((x) => x !== id)].slice(0, 6);
-  try { localStorage.setItem('loggen.recent', JSON.stringify(state.recent)); } catch {}
-  renderRecent();
-}
-
-function renderRecent() {
-  const wrap = $('recentWrap');
-  const row = $('recentRow');
-  if (!wrap || !row) return;
-
-  const items = state.recent
-    .map((id) => state.controls.find((c) => c.id === id))
-    .filter(Boolean);
-
-  wrap.classList.toggle('hidden', items.length === 0);
-  row.innerHTML = '';
-  items.forEach((c) => {
-    const b = document.createElement('button');
-    b.className = 'chip-btn';
-    b.type = 'button';
-    const a = anchorFor(c);
-    b.innerHTML = '<span class="chip-id">' + esc(a.text) + '</span>' +
-                  '<span class="chip-name">' + esc(c.name) + '</span>';
-    b.onclick = () => send(c, {});
-    row.appendChild(b);
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -458,7 +414,6 @@ async function send(control, params) {
     const res = await api('POST', '/api/send', {
       controlId: control.id, profileId: p.id, params, count, delayMs,
     });
-    rememberRecent(control.id);
     if (res.queued) {
       toast(`Queued ${res.queued} × ${control.name} → ${res.target}`, 'ok');
     } else {
