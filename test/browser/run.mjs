@@ -328,8 +328,10 @@ ck('the readout shows the record',
 ck('the priority is decoded', /PRI \d+/.test(await page.locator('#readoutMeta').textContent()));
 ck('a sent row appears', (await page.locator('.act').count()) > 0);
 ck('sent rows do not repeat the bytes', (await page.locator('.act-wire').count()) === 0);
-ck('recently sent appears',
-  !(await page.locator('#recentWrap').evaluate((e) => e.classList.contains('hidden'))));
+// The activity feed is the only record of what was sent. A second list of the
+// same sends used to sit above the grid, which said nothing the feed did not.
+ck('there is no duplicate recents strip',
+  (await page.locator('#recentWrap').count()) === 0);
 
 // Clicking a row must put that exact record back in the readout. Send a second,
 // different record first so there is always something to replay; the check is
