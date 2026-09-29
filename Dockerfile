@@ -3,9 +3,10 @@
 #   docker run --rm -p 8088:8088 -v loggen-data:/data ghcr.io/theshahrukh98khan/loggen
 #
 # The console is served on 8088 inside the container. Publishing that port makes
-# it reachable from the host; the console has no authentication, so bind it to a
-# loopback address on the host (-p 127.0.0.1:8088:8088) unless the network is one
-# you control.
+# it reachable from the host. A fresh volume signs in with admin/admin over
+# plain HTTP, so bind it to a loopback address on the host
+# (-p 127.0.0.1:8088:8088) unless the network is one you control, and change
+# the password once you are in.
 
 FROM golang:1.24-alpine AS build
 
