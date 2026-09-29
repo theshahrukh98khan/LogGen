@@ -17,6 +17,10 @@ DATA="data"
 SINK_PORT=5514
 WITH_SINK=0
 OPEN=0
+LG_USER="admin"
+LG_PASSWORD="admin"
+USER="admin"
+PASSWORD="admin"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -24,6 +28,10 @@ while [ $# -gt 0 ]; do
     --data)      DATA="$2"; shift 2 ;;
     --sink-port) SINK_PORT="$2"; shift 2 ;;
     --with-sink) WITH_SINK=1; shift ;;
+    --user)      LG_USER="$2"; shift 2 ;;
+    --password)  LG_PASSWORD="$2"; shift 2 ;;
+    --user)      USER="$2"; shift 2 ;;
+    --password)  PASSWORD="$2"; shift 2 ;;
     --open)      OPEN=1; shift ;;
     -h|--help)   sed -n '3,10p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
@@ -60,7 +68,8 @@ PORT="${ADDR##*:}"
 ready=0
 for _ in $(seq 1 30); do
   sleep 0.4
-  if curl -sf "http://127.0.0.1:${PORT}/api/controls" -o /dev/null; then ready=1; break; fi
+  # The sign-in endpoint is the one that answers without a session.
+  if curl -sf "http://127.0.0.1:${PORT}/api/auth/state" -o /dev/null; then ready=1; break; fi
 done
 
 if [ "$ready" != "1" ]; then
@@ -69,14 +78,22 @@ if [ "$ready" != "1" ]; then
   exit 1
 fi
 
-if [ "$WITH_SINK" = "1" ]; then
-  curl -sf -X POST "http://127.0.0.1:${PORT}/api/profiles" \
-    -H 'Content-Type: application/json' \
-    -d "{\"name\":\"Local sink\",\"host\":\"127.0.0.1\",\"port\":${SINK_PORT},\"protocol\":\"udp\",\"isDefault\":true}" \
-    -o /dev/null && say "destination 'Local sink' points at 127.0.0.1:${SINK_PORT}"
+# The console needs a session now, so the script holds one in a cookie jar to
+# configure the sink and read the control count back.
+JAR="$(mktemp)"
+trap 'rm -f "$JAR"' EXIT
+if ! curl -sf -c "$JAR" -X POST "http://127.0.0.1:${PORT}/api/auth/login"   -H 'Content-Type: application/json'   -d "{\"user\":\"${LG_USER}\",\"password\":\"${LG_PASSWORD}\"}" -o /dev/null; then
+  say "could not sign in as '${LG_USER}'. Pass --user and --password if it has been changed."
+  JAR=""
 fi
 
-say "$(curl -s "http://127.0.0.1:${PORT}/api/controls" | grep -o '"id":' | wc -l | tr -d ' ') controls registered"
+if [ "$WITH_SINK" = "1" ] && [ -n "$JAR" ]; then
+  curl -sf -b "$JAR" -X POST "http://127.0.0.1:${PORT}/api/profiles"     -H 'Content-Type: application/json'     -d "{\"name\":\"Local sink\",\"host\":\"127.0.0.1\",\"port\":${SINK_PORT},\"protocol\":\"udp\",\"isDefault\":true}"     -o /dev/null && say "destination 'Local sink' points at 127.0.0.1:${SINK_PORT}"
+fi
+
+if [ -n "$JAR" ]; then
+  say "$(curl -s -b "$JAR" "http://127.0.0.1:${PORT}/api/controls" | grep -o '"id":' | wc -l | tr -d ' ') controls registered"
+fi
 printf '\n'
 grep 'http://' loggen.log | sed 's/^[0-9:]* */  /'
 printf '\n'

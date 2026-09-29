@@ -21,6 +21,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/theshahrukh98khan/LogGen/internal/auth"
 	"github.com/theshahrukh98khan/LogGen/internal/catalog"
 	"github.com/theshahrukh98khan/LogGen/internal/server"
 	"github.com/theshahrukh98khan/LogGen/internal/sink"
@@ -57,6 +58,7 @@ func main() {
 	data := flag.String("data", "data", "directory holding profiles.json")
 	open := flag.Bool("open", true, "open the console in a browser on start")
 	sinkAddr := flag.String("sink", "", "run a syslog receiver on this address instead of the console, e.g. :5514")
+	resetAuth := flag.Bool("reset-auth", false, "reset the console sign-in to admin/admin and exit")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
@@ -81,6 +83,24 @@ func main() {
 		return
 	}
 
+	// Credentials live in their own file, written owner-only.
+	creds, err := auth.Open(filepath.Join(*data, "auth.json"))
+	if err != nil {
+		log.Fatalf("open credentials: %v", err)
+	}
+
+	// The way back in from a forgotten password when no mail server is
+	// configured. It needs a shell on the host, which is a higher bar than
+	// knowing the password, so it is not a way around the sign-in.
+	if *resetAuth {
+		if err := creds.Reset(); err != nil {
+			log.Fatalf("reset credentials: %v", err)
+		}
+		fmt.Printf("Sign-in reset to %s / %s. Change it after signing in.\n",
+			auth.DefaultUser, auth.DefaultPassword)
+		return
+	}
+
 	st, err := store.Open(filepath.Join(*data, "profiles.json"))
 	if err != nil {
 		log.Fatalf("open store: %v", err)
@@ -91,7 +111,7 @@ func main() {
 		log.Fatalf("mount web assets: %v", err)
 	}
 
-	console := server.New(st, webRoot)
+	console := server.New(st, webRoot, creds)
 	console.Version = buildVersion()
 
 	srv := &http.Server{
@@ -110,8 +130,11 @@ func main() {
 	for _, u := range urls {
 		log.Printf("    %s", u)
 	}
+	if creds.Config().Pristine {
+		log.Print("sign in with admin / admin, then change it in Administration > Sign-in")
+	}
 	if isWildcard(*addr) {
-		log.Print("console is bound to all interfaces and has no authentication — keep it on the lab network")
+		log.Print("console is bound to all interfaces and served over plain HTTP; keep it on the lab network")
 	}
 
 	if *open {

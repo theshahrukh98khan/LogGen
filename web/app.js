@@ -32,8 +32,23 @@ async function api(method, path, body) {
   });
   const text = await res.text();
   const data = text ? JSON.parse(text) : null;
+  if (res.status === 401) {
+    // The session lapsed or was signed out from elsewhere. Going back to the
+    // sign-in page is the only useful response, and doing it here means every
+    // caller gets it without having to think about it.
+    signedOut();
+    throw new Error('Signed out.');
+  }
   if (!res.ok) throw new Error((data && data.error) || `${res.status} ${res.statusText}`);
   return data;
+}
+
+// signedOut returns the console to the sign-in page once.
+let leaving = false;
+function signedOut() {
+  if (leaving) return;
+  leaving = true;
+  location.reload();
 }
 
 // ---------------------------------------------------------------------------
@@ -53,7 +68,7 @@ function toast(msg, kind = '') {
 // Boot
 // ---------------------------------------------------------------------------
 
-async function boot() {
+async function startConsole() {
   try {
     const s = await api('GET', '/api/state');
     state.env = s.env;
@@ -75,6 +90,7 @@ async function boot() {
   buildFacilitySelects();
   renderPlaceholders();
   renderSourceOptions();
+  renderWhoAmI();
   refreshActivity();
   setInterval(refreshActivity, 2500);
 }
@@ -723,6 +739,8 @@ function fillEnvForm() {
 // ---------------------------------------------------------------------------
 
 const GUARDED = [
+  { panel: 'adminSignin', form: 'signinForm', what: 'the sign-in' },
+  { panel: 'adminRecovery', form: 'recoveryForm', what: 'the recovery settings' },
   { panel: 'adminProfiles', form: 'profileForm', what: 'this destination' },
   { panel: 'adminCustoms', form: 'customForm', what: 'this control' },
   { panel: 'adminEstate', form: 'envForm', what: 'the simulated estate' },

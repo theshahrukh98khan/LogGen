@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/theshahrukh98khan/LogGen/internal/auth"
 	"github.com/theshahrukh98khan/LogGen/internal/catalog"
 	"github.com/theshahrukh98khan/LogGen/internal/core"
 	"github.com/theshahrukh98khan/LogGen/internal/sender"
@@ -31,8 +32,12 @@ type Server struct {
 	// Version is reported by the console's About page. Set by main after New.
 	Version string
 
-	st  *store.Store
-	web fs.FS
+	st   *store.Store
+	web  fs.FS
+	auth *auth.Store
+
+	// throttle is shared across the one account this tool has.
+	throttle *auth.Throttle
 
 	mu     sync.Mutex
 	recent []core.Activity
@@ -40,37 +45,61 @@ type Server struct {
 }
 
 // New builds a server. webFS should contain index.html at its root.
-func New(st *store.Store, webFS fs.FS) *Server {
-	return &Server{st: st, web: webFS}
+//
+// A nil credential store leaves the API ungated, which is what the unit tests
+// want and is never what main does.
+func New(st *store.Store, webFS fs.FS, creds *auth.Store) *Server {
+	return &Server{st: st, web: webFS, auth: creds, throttle: auth.NewThrottle()}
 }
 
 // Handler returns the fully routed HTTP handler.
 func (s *Server) Handler() http.Handler {
+	// Reachable without a session: the sign-in page needs them, and locking
+	// them behind the thing they grant access to would be a closed loop.
+	pub := http.NewServeMux()
+	pub.HandleFunc("GET /api/auth/state", s.handleAuthState)
+	pub.HandleFunc("POST /api/auth/login", s.handleLogin)
+	pub.HandleFunc("POST /api/auth/logout", s.handleLogout)
+	pub.HandleFunc("POST /api/auth/forgot", s.handleForgot)
+	pub.HandleFunc("POST /api/auth/reset", s.handleReset)
+
+	// These two live under /api/auth/ as well, so they have to be registered
+	// on the same mux to be reachable at all, and are gated one by one.
+	pub.Handle("POST /api/auth/change", s.requireAuth(http.HandlerFunc(s.handleChangeAuth)))
+	pub.Handle("PUT /api/auth/recovery", s.requireAuth(http.HandlerFunc(s.handleSetRecovery)))
+
+	// Everything else. A destination list names the SIEM and a send puts
+	// records on the wire, so none of it is readable without signing in.
+	api := http.NewServeMux()
+	api.HandleFunc("GET /api/state", s.handleState)
+	api.HandleFunc("GET /api/controls", s.handleControls)
+	api.HandleFunc("GET /api/activity", s.handleActivity)
+
+	api.HandleFunc("PUT /api/env", s.handleSetEnv)
+
+	api.HandleFunc("GET /api/profiles", s.handleListProfiles)
+	api.HandleFunc("POST /api/profiles", s.handleCreateProfile)
+	api.HandleFunc("PUT /api/profiles/{id}", s.handleUpdateProfile)
+	api.HandleFunc("DELETE /api/profiles/{id}", s.handleDeleteProfile)
+	api.HandleFunc("POST /api/profiles/{id}/default", s.handleSetDefault)
+	api.HandleFunc("POST /api/profiles/{id}/test", s.handleTestProfile)
+
+	api.HandleFunc("GET /api/customs", s.handleListCustoms)
+	api.HandleFunc("POST /api/customs", s.handleCreateCustom)
+	api.HandleFunc("PUT /api/customs/{id}", s.handleUpdateCustom)
+	api.HandleFunc("DELETE /api/customs/{id}", s.handleDeleteCustom)
+	api.HandleFunc("POST /api/preview-custom", s.handlePreviewCustom)
+	api.HandleFunc("GET /api/sources", s.handleSources)
+	api.HandleFunc("GET /api/placeholders", s.handlePlaceholders)
+
+	api.HandleFunc("POST /api/preview", s.handlePreview)
+	api.HandleFunc("POST /api/send", s.handleSend)
+
 	mux := http.NewServeMux()
-
-	mux.HandleFunc("GET /api/state", s.handleState)
-	mux.HandleFunc("GET /api/controls", s.handleControls)
-	mux.HandleFunc("GET /api/activity", s.handleActivity)
-
-	mux.HandleFunc("PUT /api/env", s.handleSetEnv)
-
-	mux.HandleFunc("GET /api/profiles", s.handleListProfiles)
-	mux.HandleFunc("POST /api/profiles", s.handleCreateProfile)
-	mux.HandleFunc("PUT /api/profiles/{id}", s.handleUpdateProfile)
-	mux.HandleFunc("DELETE /api/profiles/{id}", s.handleDeleteProfile)
-	mux.HandleFunc("POST /api/profiles/{id}/default", s.handleSetDefault)
-	mux.HandleFunc("POST /api/profiles/{id}/test", s.handleTestProfile)
-
-	mux.HandleFunc("GET /api/customs", s.handleListCustoms)
-	mux.HandleFunc("POST /api/customs", s.handleCreateCustom)
-	mux.HandleFunc("PUT /api/customs/{id}", s.handleUpdateCustom)
-	mux.HandleFunc("DELETE /api/customs/{id}", s.handleDeleteCustom)
-	mux.HandleFunc("POST /api/preview-custom", s.handlePreviewCustom)
-	mux.HandleFunc("GET /api/sources", s.handleSources)
-	mux.HandleFunc("GET /api/placeholders", s.handlePlaceholders)
-
-	mux.HandleFunc("POST /api/preview", s.handlePreview)
-	mux.HandleFunc("POST /api/send", s.handleSend)
+	// The more specific auth patterns win over "/api/", so the public five are
+	// reached before the gate.
+	mux.Handle("/api/", s.requireAuth(api))
+	mux.Handle("/api/auth/", pub)
 
 	mux.Handle("/", noStore(http.FileServer(http.FS(s.web))))
 

@@ -32,8 +32,12 @@ param(
     # Port for that receiver. 514 needs elevation on most systems; 5514 does not.
     [int]$SinkPort = 5514,
 
-    # Where profiles.json lives.
+    # Where profiles.json and auth.json live.
     [string]$Data = 'data',
+
+    # Console sign-in, used to configure the sink and read the control count.
+    [string]$User = 'admin',
+    [string]$Password = 'admin',
 
     # Open a browser once the console is up.
     [switch]$Open
@@ -87,14 +91,15 @@ Start-Process -FilePath "$root\loggen.exe" `
     -RedirectStandardError "$root\loggen.err" `
     -WindowStyle Hidden
 
-# Wait for it to answer rather than guessing at a sleep.
+# Wait for it to answer rather than guessing at a sleep. The sign-in endpoint
+# is the one that answers without a session.
 $port = ($Addr -split ':')[-1]
 $ready = $false
 foreach ($i in 1..30) {
     Start-Sleep -Milliseconds 400
     try {
         Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 `
-            -Uri "http://127.0.0.1:$port/api/controls" | Out-Null
+            -Uri "http://127.0.0.1:$port/api/auth/state" | Out-Null
         $ready = $true
         break
     } catch { }
@@ -107,8 +112,22 @@ if (-not $ready) {
     exit 1
 }
 
+# --- sign in ----------------------------------------------------------------
+# The console needs a session now, so the script holds one to configure the
+# sink and read the control count back.
+$session = $null
+try {
+    $creds = @{ user = $User; password = $Password } | ConvertTo-Json -Compress
+    Invoke-RestMethod -Method Post -TimeoutSec 5 `
+        -Uri "http://127.0.0.1:$port/api/auth/login" `
+        -ContentType 'application/json' -Body $creds `
+        -SessionVariable session | Out-Null
+} catch {
+    Say "could not sign in as '$User'. Pass -User and -Password if it has been changed."
+}
+
 # --- point a destination at the sink ---------------------------------------
-if ($WithSink) {
+if ($WithSink -and $session) {
     $body = @{
         name = "Local sink"; host = "127.0.0.1"; port = $SinkPort
         protocol = "udp"; isDefault = $true
@@ -116,7 +135,8 @@ if ($WithSink) {
     try {
         Invoke-RestMethod -Method Post -TimeoutSec 5 `
             -Uri "http://127.0.0.1:$port/api/profiles" `
-            -ContentType 'application/json' -Body $body | Out-Null
+            -ContentType 'application/json' -Body $body `
+            -WebSession $session | Out-Null
         Say "destination 'Local sink' points at 127.0.0.1:$SinkPort"
     } catch {
         Say "could not add the sink destination: $_"
@@ -124,8 +144,11 @@ if ($WithSink) {
 }
 
 # --- report -----------------------------------------------------------------
-$controls = (Invoke-RestMethod -Uri "http://127.0.0.1:$port/api/controls" -TimeoutSec 5).Count
-Say "$controls controls registered"
+if ($session) {
+    $controls = (Invoke-RestMethod -Uri "http://127.0.0.1:$port/api/controls" `
+        -TimeoutSec 5 -WebSession $session).Count
+    Say "$controls controls registered"
+}
 Write-Host ""
 
 Get-Content "$root\loggen.log" -ErrorAction SilentlyContinue |
