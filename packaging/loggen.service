@@ -1,0 +1,49 @@
+# systemd unit for running LogGen on Ubuntu or any systemd Linux.
+#
+# Install:
+#   sudo install -m 0755 loggen /opt/loggen/loggen
+#   sudo useradd --system --home /var/lib/loggen --shell /usr/sbin/nologin loggen
+#   sudo mkdir -p /var/lib/loggen && sudo chown loggen:loggen /var/lib/loggen
+#   sudo cp packaging/loggen.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now loggen
+#
+# The console is bound to localhost here on purpose: it has no authentication
+# and can send syslog traffic anywhere. To reach it from another machine, either
+# tunnel over SSH:
+#   ssh -L 8088:127.0.0.1:8088 user@this-host
+# or change -addr below to 0.0.0.0:8088 and restrict access with a firewall.
+
+[Unit]
+Description=LogGen - log simulation lab for SIEM onboarding and detection testing
+Documentation=https://github.com/theshahrukh98khan/LogGen
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=loggen
+Group=loggen
+ExecStart=/opt/loggen/loggen -addr 127.0.0.1:8088 -open=false -data /var/lib/loggen
+Restart=on-failure
+RestartSec=5s
+
+# Hardening. LogGen needs outbound UDP/TCP and its own data directory,
+# nothing else.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+ReadWritePaths=/var/lib/loggen
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

@@ -123,8 +123,8 @@ func registerWindowsAuth() {
 		Control: core.Control{
 			ID: "win-4624-logon-success", Source: core.SourceWindows,
 			Group: "Authentication", Name: "Successful logon",
-			Desc:     "An account was successfully logged on. Logon type distinguishes console, network and RDP sessions.",
-			EventID:  "4624", Channel: "Security", Severity: core.SevLabelInfo,
+			Desc:    "An account was successfully logged on. Logon type distinguishes console, network and RDP sessions.",
+			EventID: "4624", Channel: "Security", Severity: core.SevLabelInfo,
 			Mitre: []string{"T1078"}, Wazuh: []string{"60106"},
 			Params: []core.Param{pUser, pSrcIP, pHost,
 				param("logontype", "Logon type", "2, 3, 10 …")},
@@ -184,8 +184,8 @@ func registerWindowsAuth() {
 		Control: core.Control{
 			ID: "win-4625-logon-failed", Source: core.SourceWindows,
 			Group: "Authentication", Name: "Failed logon",
-			Desc:     "An account failed to log on. Burst this control to simulate password spraying or brute force.",
-			EventID:  "4625", Channel: "Security", Severity: core.SevLabelMedium,
+			Desc:    "An account failed to log on. Burst this control to simulate password spraying or brute force.",
+			EventID: "4625", Channel: "Security", Severity: core.SevLabelMedium,
 			Mitre: []string{"T1110"}, Wazuh: []string{"60122"},
 			Params: []core.Param{pUser, pSrcIP, pHost,
 				param("reason", "Failure reason", "badpassword, nouser, disabled, lockedout, expired")},
@@ -249,8 +249,8 @@ func registerWindowsAuth() {
 		Control: core.Control{
 			ID: "win-4634-logoff", Source: core.SourceWindows,
 			Group: "Authentication", Name: "Account logged off",
-			Desc:     "A logon session was closed. Useful for testing session correlation against 4624.",
-			EventID:  "4634", Channel: "Security", Severity: core.SevLabelInfo,
+			Desc:    "A logon session was closed. Useful for testing session correlation against 4624.",
+			EventID: "4634", Channel: "Security", Severity: core.SevLabelInfo,
 			Wazuh:  []string{"60107"},
 			Params: []core.Param{pUser},
 		},
@@ -280,8 +280,8 @@ func registerWindowsAuth() {
 		Control: core.Control{
 			ID: "win-4648-explicit-creds", Source: core.SourceWindows,
 			Group: "Authentication", Name: "Logon with explicit credentials",
-			Desc:     "An account used runas or a stored credential to authenticate as somebody else — a common lateral movement signal.",
-			EventID:  "4648", Channel: "Security", Severity: core.SevLabelMedium,
+			Desc:    "An account used runas or a stored credential to authenticate as somebody else — a common lateral movement signal.",
+			EventID: "4648", Channel: "Security", Severity: core.SevLabelMedium,
 			Mitre: []string{"T1078", "T1550"}, Wazuh: []string{"60110"},
 			Params: []core.Param{pActor, pUser, param("target", "Target server", "auto")},
 		},
@@ -324,8 +324,8 @@ func registerWindowsAuth() {
 		Control: core.Control{
 			ID: "win-4672-special-privileges", Source: core.SourceWindows,
 			Group: "Authentication", Name: "Special privileges assigned",
-			Desc:     "A logon was granted administrator-equivalent privileges. Paired with 4624 it marks a privileged session.",
-			EventID:  "4672", Channel: "Security", Severity: core.SevLabelMedium,
+			Desc:    "A logon was granted administrator-equivalent privileges. Paired with 4624 it marks a privileged session.",
+			EventID: "4672", Channel: "Security", Severity: core.SevLabelMedium,
 			Mitre: []string{"T1078.002"}, Wazuh: []string{"60115"},
 			Params: []core.Param{pUser},
 		},
@@ -363,8 +363,8 @@ func registerWindowsAuth() {
 		Control: core.Control{
 			ID: "win-4776-ntlm-validation", Source: core.SourceWindows,
 			Group: "Authentication", Name: "NTLM credential validation failed",
-			Desc:     "The domain controller failed to validate an NTLM credential. Error 0xC0000064 means the account does not exist.",
-			EventID:  "4776", Channel: "Security", Severity: core.SevLabelMedium,
+			Desc:    "The domain controller failed to validate an NTLM credential. Error 0xC0000064 means the account does not exist.",
+			EventID: "4776", Channel: "Security", Severity: core.SevLabelMedium,
 			Mitre: []string{"T1110"}, Wazuh: []string{"60133"},
 			Params: []core.Param{pUser, pHost},
 		},
@@ -381,7 +381,7 @@ func registerWindowsAuth() {
 				kv("Error Code", "0xC000006A"),
 			)
 			e.EventData = map[string]string{
-				"packageName": "MICROSOFT_AUTHENTICATION_PACKAGE_V1_0",
+				"packageName":    "MICROSOFT_AUTHENTICATION_PACKAGE_V1_0",
 				"targetUserName": user, "workstation": ws, "status": "0xc000006a",
 			}
 			return winPayload(c, e, core.SevWarning)
@@ -402,29 +402,29 @@ func registerWindowsAccounts() {
 
 	simple := []acct{
 		{id: "4720", task: "13824", name: "User account created",
-			desc:    "A new user account was created in the domain.",
-			sev:     core.SevLabelMedium,
-			mitre:   []string{"T1136.002"}, wazuh: []string{"60109"},
+			desc:  "A new user account was created in the domain.",
+			sev:   core.SevLabelMedium,
+			mitre: []string{"T1136.002"}, wazuh: []string{"60109"},
 			summary: "A user account was created."},
 		{id: "4722", task: "13824", name: "User account enabled",
-			desc:    "A previously disabled account was enabled.",
-			sev:     core.SevLabelMedium,
-			mitre:   []string{"T1098"}, wazuh: []string{"60112"},
+			desc:  "A previously disabled account was enabled.",
+			sev:   core.SevLabelMedium,
+			mitre: []string{"T1098"}, wazuh: []string{"60112"},
 			summary: "A user account was enabled."},
 		{id: "4725", task: "13824", name: "User account disabled",
-			desc:    "An account was disabled.",
-			sev:     core.SevLabelLow,
-			mitre:   []string{"T1531"}, wazuh: []string{"60117"},
+			desc:  "An account was disabled.",
+			sev:   core.SevLabelLow,
+			mitre: []string{"T1531"}, wazuh: []string{"60117"},
 			summary: "A user account was disabled."},
 		{id: "4726", task: "13824", name: "User account deleted",
-			desc:    "An account was removed from the domain.",
-			sev:     core.SevLabelMedium,
-			mitre:   []string{"T1531"}, wazuh: []string{"60114"},
+			desc:  "An account was removed from the domain.",
+			sev:   core.SevLabelMedium,
+			mitre: []string{"T1531"}, wazuh: []string{"60114"},
 			summary: "A user account was deleted."},
 		{id: "4738", task: "13824", name: "User account changed",
-			desc:    "Attributes on an account were modified.",
-			sev:     core.SevLabelLow,
-			mitre:   []string{"T1098"}, wazuh: []string{"60116"},
+			desc:  "Attributes on an account were modified.",
+			sev:   core.SevLabelLow,
+			mitre: []string{"T1098"}, wazuh: []string{"60116"},
 			summary: "A user account was changed."},
 	}
 
@@ -465,8 +465,8 @@ func registerWindowsAccounts() {
 		Control: core.Control{
 			ID: "win-4724-password-reset", Source: core.SourceWindows,
 			Group: "Account Management", Name: "Password reset attempt",
-			Desc:     "An administrator reset another account's password without knowing the old one.",
-			EventID:  "4724", Channel: "Security", Severity: core.SevLabelMedium,
+			Desc:    "An administrator reset another account's password without knowing the old one.",
+			EventID: "4724", Channel: "Security", Severity: core.SevLabelMedium,
 			Mitre: []string{"T1098"}, Wazuh: []string{"60113"},
 			Params: []core.Param{pActor, pUser},
 		},
@@ -526,8 +526,8 @@ func registerWindowsAccounts() {
 				)
 				e.EventData = map[string]string{
 					"subjectUserName": actor, "subjectDomainName": c.Env.NetBIOS,
-					"memberName": fmt.Sprintf("CN=%s,CN=Users,%s", member, dn(c.Env.Domain)),
-					"memberSid":  c.UserSID(member),
+					"memberName":     fmt.Sprintf("CN=%s,CN=Users,%s", member, dn(c.Env.Domain)),
+					"memberSid":      c.UserSID(member),
 					"targetUserName": group, "targetDomainName": c.Env.NetBIOS,
 				}
 				return winPayload(c, e, core.SevWarning)
@@ -539,8 +539,8 @@ func registerWindowsAccounts() {
 		Control: core.Control{
 			ID: "win-4740-account-lockout", Source: core.SourceWindows,
 			Group: "Account Management", Name: "Account locked out",
-			Desc:     "An account exceeded the bad password threshold and was locked. Often the tail end of a brute force.",
-			EventID:  "4740", Channel: "Security", Severity: core.SevLabelMedium,
+			Desc:    "An account exceeded the bad password threshold and was locked. Often the tail end of a brute force.",
+			EventID: "4740", Channel: "Security", Severity: core.SevLabelMedium,
 			Mitre: []string{"T1110"}, Wazuh: []string{"60120"},
 			Params: []core.Param{pUser, pHost},
 		},
@@ -580,8 +580,8 @@ func registerWindowsKerberos() {
 		Control: core.Control{
 			ID: "win-4768-tgt-request", Source: core.SourceWindows,
 			Group: "Kerberos", Name: "Kerberos TGT requested",
-			Desc:     "A Kerberos authentication ticket was issued. Result code 0x0 means success.",
-			EventID:  "4768", Channel: "Security", Severity: core.SevLabelInfo,
+			Desc:    "A Kerberos authentication ticket was issued. Result code 0x0 means success.",
+			EventID: "4768", Channel: "Security", Severity: core.SevLabelInfo,
 			Wazuh:  []string{"60126"},
 			Params: []core.Param{pUser, pSrcIP},
 		},
@@ -620,8 +620,8 @@ func registerWindowsKerberos() {
 		Control: core.Control{
 			ID: "win-4769-kerberoast", Source: core.SourceWindows,
 			Group: "Kerberos", Name: "Service ticket requested (kerberoasting)",
-			Desc:     "A service ticket was requested with RC4 encryption (0x17) for a service account — the signature of kerberoasting.",
-			EventID:  "4769", Channel: "Security", Severity: core.SevLabelHigh,
+			Desc:    "A service ticket was requested with RC4 encryption (0x17) for a service account — the signature of kerberoasting.",
+			EventID: "4769", Channel: "Security", Severity: core.SevLabelHigh,
 			Mitre: []string{"T1558.003"}, Wazuh: []string{"60127"},
 			Params: []core.Param{pUser, pSrcIP,
 				param("service", "Service name", "auto"),
@@ -666,8 +666,8 @@ func registerWindowsKerberos() {
 		Control: core.Control{
 			ID: "win-4771-preauth-failed", Source: core.SourceWindows,
 			Group: "Kerberos", Name: "Kerberos pre-authentication failed",
-			Desc:     "Failure code 0x18 means a bad password over Kerberos. Burst this to simulate a domain brute force.",
-			EventID:  "4771", Channel: "Security", Severity: core.SevLabelMedium,
+			Desc:    "Failure code 0x18 means a bad password over Kerberos. Burst this to simulate a domain brute force.",
+			EventID: "4771", Channel: "Security", Severity: core.SevLabelMedium,
 			Mitre: []string{"T1110"}, Wazuh: []string{"60128"},
 			Params: []core.Param{pUser, pSrcIP},
 		},
@@ -710,8 +710,8 @@ func registerWindowsExecution() {
 		Control: core.Control{
 			ID: "win-4688-process-creation", Source: core.SourceWindows,
 			Group: "Execution", Name: "Process creation",
-			Desc:     "A new process was created. Command line auditing must be enabled for the command line field to be populated.",
-			EventID:  "4688", Channel: "Security", Severity: core.SevLabelLow,
+			Desc:    "A new process was created. Command line auditing must be enabled for the command line field to be populated.",
+			EventID: "4688", Channel: "Security", Severity: core.SevLabelLow,
 			Mitre: []string{"T1059"}, Wazuh: []string{"61138"},
 			Params: []core.Param{pUser,
 				param("process", "New process path", "auto"),
@@ -765,8 +765,8 @@ func registerWindowsExecution() {
 		Control: core.Control{
 			ID: "win-4104-powershell-scriptblock", Source: core.SourceWindows,
 			Group: "Execution", Name: "PowerShell script block logging",
-			Desc:     "Script block logging captured PowerShell code at execution time, after any obfuscation is resolved.",
-			EventID:  "4104", Channel: "Microsoft-Windows-PowerShell/Operational",
+			Desc:    "Script block logging captured PowerShell code at execution time, after any obfuscation is resolved.",
+			EventID: "4104", Channel: "Microsoft-Windows-PowerShell/Operational",
 			Severity: core.SevLabelHigh,
 			Mitre:    []string{"T1059.001"}, Wazuh: []string{"91802"},
 			Params: []core.Param{pUser, param("script", "Script block text", "auto")},
@@ -808,8 +808,8 @@ func registerWindowsExecution() {
 		Control: core.Control{
 			ID: "win-7045-service-installed", Source: core.SourceWindows,
 			Group: "Persistence", Name: "Service installed (System log)",
-			Desc:     "Service Control Manager registered a new service. A classic persistence and lateral movement artefact.",
-			EventID:  "7045", Channel: "System", Severity: core.SevLabelHigh,
+			Desc:    "Service Control Manager registered a new service. A classic persistence and lateral movement artefact.",
+			EventID: "7045", Channel: "System", Severity: core.SevLabelHigh,
 			Mitre: []string{"T1543.003"}, Wazuh: []string{"61101"},
 			Params: []core.Param{
 				param("service", "Service name", "auto"),
@@ -825,9 +825,9 @@ func registerWindowsExecution() {
 
 			e := &core.WinEvent{
 				EventID: "7045", Channel: "System",
-				Provider: "Service Control Manager",
+				Provider:     "Service Control Manager",
 				ProviderGUID: "{555908d1-a6d7-4695-8e1e-26931d2012f4}",
-				Task: "0", TaskName: "None",
+				Task:         "0", TaskName: "None",
 				AuditType: core.AuditInfo, Keywords: "0x8080000000000000",
 				Computer: c.WinFQDN(), User: "N/A",
 				Criticality: 3, RecordID: c.Int(10000, 99999),
@@ -854,8 +854,8 @@ func registerWindowsExecution() {
 		Control: core.Control{
 			ID: "win-4697-service-installed-security", Source: core.SourceWindows,
 			Group: "Persistence", Name: "Service installed (Security log)",
-			Desc:     "The Security channel equivalent of 7045, available when the System Security Extension subcategory is audited.",
-			EventID:  "4697", Channel: "Security", Severity: core.SevLabelHigh,
+			Desc:    "The Security channel equivalent of 7045, available when the System Security Extension subcategory is audited.",
+			EventID: "4697", Channel: "Security", Severity: core.SevLabelHigh,
 			Mitre: []string{"T1543.003"}, Wazuh: []string{"61143"},
 			Params: []core.Param{pUser, param("service", "Service name", "auto"), param("path", "Binary path", "auto")},
 		},
@@ -889,8 +889,8 @@ func registerWindowsExecution() {
 		Control: core.Control{
 			ID: "win-4698-scheduled-task", Source: core.SourceWindows,
 			Group: "Persistence", Name: "Scheduled task created",
-			Desc:     "A scheduled task was registered. The task XML carries the command that will run.",
-			EventID:  "4698", Channel: "Security", Severity: core.SevLabelHigh,
+			Desc:    "A scheduled task was registered. The task XML carries the command that will run.",
+			EventID: "4698", Channel: "Security", Severity: core.SevLabelHigh,
 			Mitre: []string{"T1053.005"}, Wazuh: []string{"61144"},
 			Params: []core.Param{pUser, param("task", "Task name", "auto"), param("command", "Command", "auto")},
 		},
@@ -928,8 +928,8 @@ func registerWindowsExecution() {
 		Control: core.Control{
 			ID: "win-4657-registry-modified", Source: core.SourceWindows,
 			Group: "Persistence", Name: "Registry value modified",
-			Desc:     "A registry value was changed. Run keys are the most common persistence target.",
-			EventID:  "4657", Channel: "Security", Severity: core.SevLabelMedium,
+			Desc:    "A registry value was changed. Run keys are the most common persistence target.",
+			EventID: "4657", Channel: "Security", Severity: core.SevLabelMedium,
 			Mitre: []string{"T1547.001", "T1112"}, Wazuh: []string{"61140"},
 			Params: []core.Param{pUser, param("key", "Registry key", "auto"), param("value", "New value", "auto")},
 		},
@@ -971,8 +971,8 @@ func registerWindowsExecution() {
 		Control: core.Control{
 			ID: "win-1116-defender-detection", Source: core.SourceWindows,
 			Group: "Malware", Name: "Defender detected malware",
-			Desc:     "Microsoft Defender Antivirus detected malware or unwanted software on the endpoint.",
-			EventID:  "1116", Channel: "Microsoft-Windows-Windows Defender/Operational",
+			Desc:    "Microsoft Defender Antivirus detected malware or unwanted software on the endpoint.",
+			EventID: "1116", Channel: "Microsoft-Windows-Windows Defender/Operational",
 			Severity: core.SevLabelCritical,
 			Mitre:    []string{"T1204"}, Wazuh: []string{"62123"},
 			Params: []core.Param{pUser, param("threat", "Threat name", "auto"), param("path", "File path", "auto")},
@@ -987,9 +987,9 @@ func registerWindowsExecution() {
 
 			e := &core.WinEvent{
 				EventID: "1116", Channel: "Microsoft-Windows-Windows Defender/Operational",
-				Provider: "Microsoft-Windows-Windows Defender",
+				Provider:     "Microsoft-Windows-Windows Defender",
 				ProviderGUID: "{11cd958a-c507-4ef3-b3f2-5fd9dfbd2c78}",
-				Task: "0", TaskName: "None",
+				Task:         "0", TaskName: "None",
 				AuditType: core.AuditWarning, Keywords: "0x8000000000000000",
 				Computer: c.WinFQDN(), User: c.Env.NetBIOS + `\` + user,
 				Criticality: 4, RecordID: c.Int(1000, 99999),
@@ -1029,8 +1029,8 @@ func registerWindowsDefenseEvasion() {
 		Control: core.Control{
 			ID: "win-1102-log-cleared", Source: core.SourceWindows,
 			Group: "Defense Evasion", Name: "Audit log cleared",
-			Desc:     "The Security event log was cleared. There is almost no benign reason for this on a server.",
-			EventID:  "1102", Channel: "Security", Severity: core.SevLabelCritical,
+			Desc:    "The Security event log was cleared. There is almost no benign reason for this on a server.",
+			EventID: "1102", Channel: "Security", Severity: core.SevLabelCritical,
 			Mitre: []string{"T1070.001"}, Wazuh: []string{"60137"},
 			Params: []core.Param{pUser},
 		},
@@ -1038,9 +1038,9 @@ func registerWindowsDefenseEvasion() {
 			user := c.P("user", c.AdminUser())
 			e := &core.WinEvent{
 				EventID: "1102", Channel: "Security",
-				Provider: "Microsoft-Windows-Eventlog",
+				Provider:     "Microsoft-Windows-Eventlog",
 				ProviderGUID: "{fc65ddd8-d6ef-4962-83d5-6e5cfe9ce148}",
-				Task: "104", TaskName: "Log clear",
+				Task:         "104", TaskName: "Log clear",
 				AuditType: core.AuditInfo, Keywords: "0x4020000000000000",
 				Computer: c.WinFQDN(), User: c.Env.NetBIOS + `\` + user,
 				Criticality: 4, RecordID: c.Int(100000, 999999),
@@ -1066,8 +1066,8 @@ func registerWindowsDefenseEvasion() {
 		Control: core.Control{
 			ID: "win-4719-audit-policy-changed", Source: core.SourceWindows,
 			Group: "Defense Evasion", Name: "System audit policy changed",
-			Desc:     "An audit subcategory was reconfigured, typically to stop a category being logged at all.",
-			EventID:  "4719", Channel: "Security", Severity: core.SevLabelHigh,
+			Desc:    "An audit subcategory was reconfigured, typically to stop a category being logged at all.",
+			EventID: "4719", Channel: "Security", Severity: core.SevLabelHigh,
 			Mitre: []string{"T1562.002"}, Wazuh: []string{"60112"},
 			Params: []core.Param{pUser, param("subcategory", "Subcategory", "auto")},
 		},
@@ -1105,8 +1105,8 @@ func registerWindowsLateral() {
 		Control: core.Control{
 			ID: "win-5140-share-access", Source: core.SourceWindows,
 			Group: "Lateral Movement", Name: "Network share accessed",
-			Desc:     "A network share was accessed. Access to ADMIN$ or C$ is a strong lateral movement indicator.",
-			EventID:  "5140", Channel: "Security", Severity: core.SevLabelMedium,
+			Desc:    "A network share was accessed. Access to ADMIN$ or C$ is a strong lateral movement indicator.",
+			EventID: "5140", Channel: "Security", Severity: core.SevLabelMedium,
 			Mitre: []string{"T1021.002"}, Wazuh: []string{"60148"},
 			Params: []core.Param{pUser, pSrcIP, param("share", "Share name", `\\*\ADMIN$`)},
 		},
@@ -1144,8 +1144,8 @@ func registerWindowsLateral() {
 		Control: core.Control{
 			ID: "win-5145-share-file-access", Source: core.SourceWindows,
 			Group: "Lateral Movement", Name: "Detailed file share access",
-			Desc:     "A specific file on a share was accessed. Requests for SYSVOL scripts or NTDS files stand out here.",
-			EventID:  "5145", Channel: "Security", Severity: core.SevLabelMedium,
+			Desc:    "A specific file on a share was accessed. Requests for SYSVOL scripts or NTDS files stand out here.",
+			EventID: "5145", Channel: "Security", Severity: core.SevLabelMedium,
 			Mitre: []string{"T1021.002"}, Wazuh: []string{"60149"},
 			Params: []core.Param{pUser, pSrcIP, param("file", "Relative file path", "auto")},
 		},

@@ -127,12 +127,12 @@ func oraclePayload(c *core.Ctx, tag string, pid, severity int, msg string) core.
 // ---------------------------------------------------------------------------
 
 var (
-	oraDBUsers    = []string{"APP_USER", "REPORTS", "BATCH_JOB", "DEVOPS", "ANALYTICS"}
-	oraPrivUsers  = []string{"SYS", "SYSTEM", "DBA_ADMIN", "SYSDBA"}
-	oraSchemas    = []string{"HR", "FINANCE", "SALES", "PAYROLL"}
-	oraTables     = []string{"EMPLOYEES", "SALARIES", "CUSTOMERS", "CARD_DATA", "ACCOUNTS"}
-	oraPrograms   = []string{"sqlplus@app01 (TNS V1-V3)", "JDBC Thin Client", "SQL Developer", "toad.exe"}
-	oraTerminals  = []string{"pts/0", "pts/1", "unknown", "APPSRV01"}
+	oraDBUsers   = []string{"APP_USER", "REPORTS", "BATCH_JOB", "DEVOPS", "ANALYTICS"}
+	oraPrivUsers = []string{"SYS", "SYSTEM", "DBA_ADMIN", "SYSDBA"}
+	oraSchemas   = []string{"HR", "FINANCE", "SALES", "PAYROLL"}
+	oraTables    = []string{"EMPLOYEES", "SALARIES", "CUSTOMERS", "CARD_DATA", "ACCOUNTS"}
+	oraPrograms  = []string{"sqlplus@app01 (TNS V1-V3)", "JDBC Thin Client", "SQL Developer", "toad.exe"}
+	oraTerminals = []string{"pts/0", "pts/1", "unknown", "APPSRV01"}
 )
 
 func oraUser(c *core.Ctx) string     { return c.PickFrom(oraDBUsers) }
@@ -223,8 +223,8 @@ func registerOracleStandardAudit() {
 		Control: core.Control{
 			ID: "oracle-audit-logon-success", Source: core.SourceOracle,
 			Group: "Audit Trail", Name: "Database logon succeeded",
-			Desc:     "A session was established. ACTION 100 with RETURNCODE 0 is the baseline every Oracle rule has to tolerate.",
-			EventID:  actLogon, Channel: "audit", Severity: core.SevLabelInfo,
+			Desc:    "A session was established. ACTION 100 with RETURNCODE 0 is the baseline every Oracle rule has to tolerate.",
+			EventID: actLogon, Channel: "audit", Severity: core.SevLabelInfo,
 			Mitre:  []string{"T1078"},
 			Params: []core.Param{oUser, oSrcIP},
 		},
@@ -272,8 +272,8 @@ func registerOracleStandardAudit() {
 		Control: core.Control{
 			ID: "oracle-audit-logoff", Source: core.SourceOracle,
 			Group: "Audit Trail", Name: "Database logoff",
-			Desc:     "ACTION 101. Paired with a logon it gives session duration.",
-			EventID:  actLogoff, Channel: "audit", Severity: core.SevLabelInfo,
+			Desc:    "ACTION 101. Paired with a logon it gives session duration.",
+			EventID: actLogoff, Channel: "audit", Severity: core.SevLabelInfo,
 			Params: []core.Param{oUser},
 		},
 		Build: func(c *core.Ctx) core.Payload {
@@ -287,8 +287,8 @@ func registerOracleStandardAudit() {
 		Control: core.Control{
 			ID: "oracle-audit-select-sensitive", Source: core.SourceOracle,
 			Group: "Data Access", Name: "SELECT on a sensitive table",
-			Desc:     "ACTION 3 against an audited table. Volume here is what separates a report from a bulk extraction.",
-			EventID:  actSelect, Channel: "audit", Severity: core.SevLabelMedium,
+			Desc:    "ACTION 3 against an audited table. Volume here is what separates a report from a bulk extraction.",
+			EventID: actSelect, Channel: "audit", Severity: core.SevLabelMedium,
 			Mitre:  []string{"T1005"},
 			Params: []core.Param{oUser, oSchema, oTable},
 		},
@@ -306,8 +306,8 @@ func registerOracleStandardAudit() {
 		Control: core.Control{
 			ID: "oracle-audit-session-summary", Source: core.SourceOracle,
 			Group: "Data Access", Name: "Session summary (BY SESSION auditing)",
-			Desc:     "ACTION 103. Under AUDIT ... BY SESSION, Oracle emits one summary whose SES$ACTIONS string encodes which statement types succeeded or failed.",
-			EventID:  actSessionRec, Channel: "audit", Severity: core.SevLabelMedium,
+			Desc:    "ACTION 103. Under AUDIT ... BY SESSION, Oracle emits one summary whose SES$ACTIONS string encodes which statement types succeeded or failed.",
+			EventID: actSessionRec, Channel: "audit", Severity: core.SevLabelMedium,
 			Mitre:  []string{"T1005"},
 			Params: []core.Param{oUser, oSchema, oTable},
 		},
@@ -352,8 +352,8 @@ func registerOracleStandardAudit() {
 		Control: core.Control{
 			ID: "oracle-audit-select-denied", Source: core.SourceOracle,
 			Group: "Data Access", Name: "SELECT denied (table does not exist)",
-			Desc:     "RETURNCODE 942. A burst of these from one session is schema enumeration, and is what blind SQL injection looks like from the database side.",
-			EventID:  actSelect, Channel: "audit", Severity: core.SevLabelHigh,
+			Desc:    "RETURNCODE 942. A burst of these from one session is schema enumeration, and is what blind SQL injection looks like from the database side.",
+			EventID: actSelect, Channel: "audit", Severity: core.SevLabelHigh,
 			Mitre:  []string{"T1190", "T1087"},
 			Params: []core.Param{oUser, oTable},
 		},
@@ -370,8 +370,8 @@ func registerOracleStandardAudit() {
 		Control: core.Control{
 			ID: "oracle-audit-insufficient-privileges", Source: core.SourceOracle,
 			Group: "Data Access", Name: "Action denied (insufficient privileges)",
-			Desc:     "RETURNCODE 1031. An account reaching for something it cannot have, repeatedly, is privilege probing.",
-			EventID:  actSelect, Channel: "audit", Severity: core.SevLabelHigh,
+			Desc:    "RETURNCODE 1031. An account reaching for something it cannot have, repeatedly, is privilege probing.",
+			EventID: actSelect, Channel: "audit", Severity: core.SevLabelHigh,
 			Mitre:  []string{"T1068"},
 			Params: []core.Param{oUser, oSchema, oTable},
 		},
@@ -433,8 +433,8 @@ func registerOracleStandardAudit() {
 		Control: core.Control{
 			ID: "oracle-audit-system-grant", Source: core.SourceOracle,
 			Group: "Account Management", Name: "System privilege granted",
-			Desc:     "ACTION 108. Granting DBA or SELECT ANY TABLE hands over the instance; there is rarely a routine reason for it.",
-			EventID:  actSystemGrant, Channel: "audit", Severity: core.SevLabelCritical,
+			Desc:    "ACTION 108. Granting DBA or SELECT ANY TABLE hands over the instance; there is rarely a routine reason for it.",
+			EventID: actSystemGrant, Channel: "audit", Severity: core.SevLabelCritical,
 			Mitre: []string{"T1098"},
 			Params: []core.Param{
 				param("actor", "Acting account", "auto"),
@@ -456,8 +456,8 @@ func registerOracleStandardAudit() {
 		Control: core.Control{
 			ID: "oracle-audit-grant-role", Source: core.SourceOracle,
 			Group: "Account Management", Name: "Role granted",
-			Desc:     "ACTION 114. Role membership is the usual route to privilege, and is quieter than a direct system grant.",
-			EventID:  actGrantRole, Channel: "audit", Severity: core.SevLabelHigh,
+			Desc:    "ACTION 114. Role membership is the usual route to privilege, and is quieter than a direct system grant.",
+			EventID: actGrantRole, Channel: "audit", Severity: core.SevLabelHigh,
 			Mitre: []string{"T1098"},
 			Params: []core.Param{
 				param("actor", "Acting account", "auto"),
@@ -479,8 +479,8 @@ func registerOracleStandardAudit() {
 		Control: core.Control{
 			ID: "oracle-audit-create-dblink", Source: core.SourceOracle,
 			Group: "Exfiltration", Name: "Database link created",
-			Desc:     "ACTION 32. A database link is a standing outbound channel to another instance, and an easy way to move data off the box.",
-			EventID:  actCreateDBLink, Channel: "audit", Severity: core.SevLabelCritical,
+			Desc:    "ACTION 32. A database link is a standing outbound channel to another instance, and an easy way to move data off the box.",
+			EventID: actCreateDBLink, Channel: "audit", Severity: core.SevLabelCritical,
 			Mitre:  []string{"T1041"},
 			Params: []core.Param{oUser, param("target", "Remote host", "auto")},
 		},
@@ -532,8 +532,8 @@ func registerOracleStandardAudit() {
 		Control: core.Control{
 			ID: "oracle-audit-noaudit", Source: core.SourceOracle,
 			Group: "Defense Evasion", Name: "Auditing disabled",
-			Desc:     "ACTION 105. Turning auditing off is the database equivalent of clearing the event log, and the record of it is the last one you get.",
-			EventID:  actSystemNoaudit, Channel: "audit", Severity: core.SevLabelCritical,
+			Desc:    "ACTION 105. Turning auditing off is the database equivalent of clearing the event log, and the record of it is the last one you get.",
+			EventID: actSystemNoaudit, Channel: "audit", Severity: core.SevLabelCritical,
 			Mitre:  []string{"T1562"},
 			Params: []core.Param{param("actor", "Acting account", "auto")},
 		},
@@ -550,8 +550,8 @@ func registerOracleStandardAudit() {
 		Control: core.Control{
 			ID: "oracle-audit-alter-system", Source: core.SourceOracle,
 			Group: "Defense Evasion", Name: "ALTER SYSTEM executed",
-			Desc:     "ACTION 49. Instance-level parameter changes can disable auditing, relocate trace files or open network access.",
-			EventID:  actAlterSystem, Channel: "audit", Severity: core.SevLabelHigh,
+			Desc:    "ACTION 49. Instance-level parameter changes can disable auditing, relocate trace files or open network access.",
+			EventID: actAlterSystem, Channel: "audit", Severity: core.SevLabelHigh,
 			Mitre:  []string{"T1562"},
 			Params: []core.Param{param("actor", "Acting account", "auto"), param("parameter", "Parameter", "auto")},
 		},
@@ -634,8 +634,8 @@ func registerOracleUnifiedAudit() {
 		Control: core.Control{
 			ID: "oracle-unified-object-access", Source: core.SourceOracle,
 			Group: "Unified Audit", Name: "Unified audit: object access",
-			Desc:     "A unified record naming the schema and object, which is where SCHEMA and OBJNAME are populated rather than empty.",
-			EventID:  actSelect, Channel: "unified", Severity: core.SevLabelMedium,
+			Desc:    "A unified record naming the schema and object, which is where SCHEMA and OBJNAME are populated rather than empty.",
+			EventID: actSelect, Channel: "unified", Severity: core.SevLabelMedium,
 			Mitre:  []string{"T1005"},
 			Params: []core.Param{oUser, oSchema, oTable},
 		},
@@ -673,8 +673,8 @@ func registerOracleListener() {
 		Control: core.Control{
 			ID: "oracle-listener-connect", Source: core.SourceOracle,
 			Group: "Listener", Name: "Listener connection established",
-			Desc:     "A successful TNS connection, return code 0. The CONNECT_DATA block names the client program, which is the most useful field here.",
-			Channel:  "listener", Severity: core.SevLabelInfo,
+			Desc:    "A successful TNS connection, return code 0. The CONNECT_DATA block names the client program, which is the most useful field here.",
+			Channel: "listener", Severity: core.SevLabelInfo,
 			Params: []core.Param{oUser, oSrcIP, param("program", "Client program", "auto")},
 		},
 		Build: func(c *core.Ctx) core.Payload {
@@ -801,8 +801,8 @@ func registerOracleAlert() {
 		Control: core.Control{
 			ID: "oracle-alert-startup", Source: core.SourceOracle,
 			Group: "Alert Log", Name: "Instance startup",
-			Desc:     "The instance started. Unscheduled restarts are worth alerting on, since a restart reloads parameters an attacker may have changed.",
-			Channel:  "alert", Severity: core.SevLabelMedium,
+			Desc:    "The instance started. Unscheduled restarts are worth alerting on, since a restart reloads parameters an attacker may have changed.",
+			Channel: "alert", Severity: core.SevLabelMedium,
 		},
 		Build: func(c *core.Ctx) core.Payload {
 			return oraclePayload(c, "oracle_alert", 0, core.SevNotice,
@@ -816,9 +816,9 @@ func registerOracleAlert() {
 		Control: core.Control{
 			ID: "oracle-alert-shutdown", Source: core.SourceOracle,
 			Group: "Alert Log", Name: "Instance shutdown",
-			Desc:     "The instance stopped. An unexplained shutdown takes the audit trail down with it.",
-			Channel:  "alert", Severity: core.SevLabelHigh,
-			Mitre:    []string{"T1489"},
+			Desc:    "The instance stopped. An unexplained shutdown takes the audit trail down with it.",
+			Channel: "alert", Severity: core.SevLabelHigh,
+			Mitre: []string{"T1489"},
 		},
 		Build: func(c *core.Ctx) core.Payload {
 			return oraclePayload(c, "oracle_alert", 0, core.SevWarning,
@@ -830,8 +830,8 @@ func registerOracleAlert() {
 		Control: core.Control{
 			ID: "oracle-alert-ora600", Source: core.SourceOracle,
 			Group: "Alert Log", Name: "ORA-00600 internal error",
-			Desc:     "An internal error with a trace file and incident number. Repeated ORA-00600 is instability, and occasionally the visible edge of an exploit attempt.",
-			EventID:  "ORA-00600", Channel: "alert", Severity: core.SevLabelHigh,
+			Desc:    "An internal error with a trace file and incident number. Repeated ORA-00600 is instability, and occasionally the visible edge of an exploit attempt.",
+			EventID: "ORA-00600", Channel: "alert", Severity: core.SevLabelHigh,
 		},
 		Build: func(c *core.Ctx) core.Payload {
 			incident := c.Int(10000, 99999)
@@ -851,8 +851,8 @@ func registerOracleAlert() {
 		Control: core.Control{
 			ID: "oracle-alert-ora1555", Source: core.SourceOracle,
 			Group: "Alert Log", Name: "ORA-01555 snapshot too old",
-			Desc:     "A long-running query outlived its undo. Usually a tuning problem, but a sudden cluster can mean somebody is running very large unplanned reads.",
-			EventID:  "ORA-01555", Channel: "alert", Severity: core.SevLabelMedium,
+			Desc:    "A long-running query outlived its undo. Usually a tuning problem, but a sudden cluster can mean somebody is running very large unplanned reads.",
+			EventID: "ORA-01555", Channel: "alert", Severity: core.SevLabelMedium,
 		},
 		Build: func(c *core.Ctx) core.Payload {
 			return oraclePayload(c, "oracle_alert", 0, core.SevWarning,
@@ -866,9 +866,9 @@ func registerOracleAlert() {
 		Control: core.Control{
 			ID: "oracle-alert-ni-connect-error", Source: core.SourceOracle,
 			Group: "Alert Log", Name: "Fatal NI connect error",
-			Desc:     "A network-layer connection failure recorded against the instance, with the client address that caused it.",
-			EventID:  "TNS-12537", Channel: "alert", Severity: core.SevLabelMedium,
-			Mitre: []string{"T1046"},
+			Desc:    "A network-layer connection failure recorded against the instance, with the client address that caused it.",
+			EventID: "TNS-12537", Channel: "alert", Severity: core.SevLabelMedium,
+			Mitre:  []string{"T1046"},
 			Params: []core.Param{oSrcIP},
 		},
 		Build: func(c *core.Ctx) core.Payload {

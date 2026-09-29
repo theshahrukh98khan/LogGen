@@ -20,21 +20,21 @@ import (
 // appear in a row before the description.
 func encodeWinSnare(e *core.WinEvent, now time.Time) string {
 	fields := []string{
-		"MSWinEventLog",                      // 1  header
-		strconv.Itoa(e.Criticality),          // 2  criticality 0-4
-		e.Channel,                            // 3  log name
-		strconv.Itoa(e.RecordID),             // 4  Snare event counter
+		"MSWinEventLog",                        // 1  header
+		strconv.Itoa(e.Criticality),            // 2  criticality 0-4
+		e.Channel,                              // 3  log name
+		strconv.Itoa(e.RecordID),               // 4  Snare event counter
 		now.Format("Mon Jan 02 15:04:05 2006"), // 5  submit time
-		e.EventID,                            // 6  event ID
-		e.Provider,                           // 7  source name
-		snareUser(e.User),                    // 8  user
-		snareSIDType(e.User),                 // 9  SID type
-		e.AuditType,                          // 10 event log type
-		e.Computer,                           // 11 computer
-		e.TaskName,                           // 12 category
-		"",                                   // 13 data string
-		snareFlatten(e.Message),              // 14 expanded description
-		strconv.Itoa(e.RecordID),             // 15 counter
+		e.EventID,                              // 6  event ID
+		e.Provider,                             // 7  source name
+		snareUser(e.User),                      // 8  user
+		snareSIDType(e.User),                   // 9  SID type
+		e.AuditType,                            // 10 event log type
+		e.Computer,                             // 11 computer
+		e.TaskName,                             // 12 category
+		"",                                     // 13 data string
+		snareFlatten(e.Message),                // 14 expanded description
+		strconv.Itoa(e.RecordID),               // 15 counter
 	}
 	return strings.Join(fields, "\t")
 }
