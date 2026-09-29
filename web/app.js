@@ -6,8 +6,12 @@ const state = {
   controls: [],
   source: 'all',
   query: '',
-  active: null, // control currently open in the drawer
+  active: null,   // control currently open in the drawer
+  lastSeq: 0,     // newest activity sequence number already rendered
 };
+
+// Matches activityCap in the server; the feed keeps at most this many rows.
+const ACTIVITY_CAP = 400;
 
 const $ = (id) => document.getElementById(id);
 
@@ -258,6 +262,62 @@ function drawerParams() {
 // Activity
 // ---------------------------------------------------------------------------
 
+// activityEntry builds one row of the feed.
+function activityEntry(a) {
+  const el = document.createElement('div');
+  el.className = 'act' + (a.ok ? '' : ' fail');
+  el.dataset.seq = a.seq;
+  const t = new Date(a.time).toLocaleTimeString();
+  el.innerHTML = `
+    <div class="act-head">
+      <span class="act-name">${esc(a.control)}</span>
+      <span class="act-time">${esc(t)}</span>
+    </div>
+    <div class="act-meta">${esc(a.target)} · ${a.ok ? `${a.bytes} bytes` : 'FAILED'}</div>
+    ${a.error ? `<div class="act-err">${esc(a.error)}</div>` : ''}
+    ${a.wire ? `<pre class="act-wire">${esc(a.wire)}</pre>` : ''}`;
+  return el;
+}
+
+// refreshActivity prepends whatever is new rather than rebuilding the feed.
+//
+// The feed is polled on a timer, and a full rebuild on every tick would discard
+// any text the operator had selected — which matters here, because copying a
+// record out of the feed to paste into a decoder is the main thing this panel is
+// for. Entries carry a monotonic sequence number so we can tell what is new.
+function renderActivity(list) {
+  const box = $('activityList');
+
+  if (!list || !list.length) {
+    if (state.lastSeq !== 0 || !box.querySelector('.hint')) {
+      box.innerHTML = '<p class="hint">Nothing sent yet. Click a control to emit a record.</p>';
+      state.lastSeq = 0;
+    }
+    return;
+  }
+
+  // The API returns newest first.
+  const fresh = list.filter((a) => a.seq > state.lastSeq);
+  if (!fresh.length) return;
+
+  // A cleared view, or a server restart that reset the counter, needs a rebuild.
+  const rebuild = state.lastSeq === 0 || list[list.length - 1].seq > state.lastSeq + 1;
+  if (rebuild) {
+    box.innerHTML = '';
+    list.forEach((a) => box.appendChild(activityEntry(a)));
+  } else {
+    // Oldest of the new batch first, so each prepend leaves them newest-first.
+    for (let i = fresh.length - 1; i >= 0; i--) {
+      box.insertBefore(activityEntry(fresh[i]), box.firstChild);
+    }
+    while (box.children.length > ACTIVITY_CAP) {
+      box.removeChild(box.lastChild);
+    }
+  }
+
+  state.lastSeq = list[0].seq;
+}
+
 async function refreshActivity() {
   let list;
   try {
@@ -265,26 +325,7 @@ async function refreshActivity() {
   } catch {
     return;
   }
-  const box = $('activityList');
-  if (!list || !list.length) {
-    box.innerHTML = '<p class="hint">Nothing sent yet. Click a control to emit a record.</p>';
-    return;
-  }
-  box.innerHTML = '';
-  list.forEach((a) => {
-    const el = document.createElement('div');
-    el.className = 'act' + (a.ok ? '' : ' fail');
-    const t = new Date(a.time).toLocaleTimeString();
-    el.innerHTML = `
-      <div class="act-head">
-        <span class="act-name">${esc(a.control)}</span>
-        <span class="act-time">${esc(t)}</span>
-      </div>
-      <div class="act-meta">${esc(a.target)} · ${a.ok ? `${a.bytes} bytes` : 'FAILED'}</div>
-      ${a.error ? `<div class="act-err">${esc(a.error)}</div>` : ''}
-      ${a.wire ? `<pre class="act-wire">${esc(a.wire)}</pre>` : ''}`;
-    box.appendChild(el);
-  });
+  renderActivity(list);
 }
 
 // ---------------------------------------------------------------------------
@@ -439,6 +480,8 @@ $('drawerSend').onclick = () => state.active && send(state.active, drawerParams(
 
 $('btnClearActivity').onclick = () => {
   $('activityList').innerHTML = '<p class="hint">View cleared. New sends will appear here.</p>';
+  // Forget what was rendered so the next poll repopulates from scratch.
+  state.lastSeq = 0;
 };
 
 document.addEventListener('keydown', (e) => {

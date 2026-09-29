@@ -32,6 +32,7 @@ type Server struct {
 
 	mu     sync.Mutex
 	recent []core.Activity
+	seq    uint64
 }
 
 // New builds a server. webFS should contain index.html at its root.
@@ -342,6 +343,8 @@ func (s *Server) burst(def core.Definition, p core.Profile, params map[string]st
 func (s *Server) record(a core.Activity) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.seq++
+	a.Seq = s.seq
 	s.recent = append(s.recent, a)
 	if len(s.recent) > activityCap {
 		s.recent = s.recent[len(s.recent)-activityCap:]

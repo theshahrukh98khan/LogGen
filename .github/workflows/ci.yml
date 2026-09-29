@@ -35,6 +35,14 @@ jobs:
       - name: Build
         run: go build ./...
 
+      - name: Test
+        run: go test ./... -count=1
+
+      # The runner has a C toolchain, so the race detector is available here
+      # even where it is not on a developer's machine.
+      - name: Test under the race detector
+        run: go test ./... -race -count=1
+
   cross:
     name: Cross-compile
     runs-on: ubuntu-latest
