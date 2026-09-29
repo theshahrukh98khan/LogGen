@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"sort"
 
-	"socbyte.ai/logsource/internal/core"
+	"github.com/theshahrukh98khan/LogGen/internal/core"
 )
 
 var (
@@ -94,10 +94,10 @@ func init() {
 			},
 		},
 		Build: func(c *core.Ctx) core.Payload {
-			note := c.P("note", "logsource connectivity test")
+			note := c.P("note", "loggen connectivity test")
 			return core.Payload{
 				Kind:     "diagnostics",
-				Tag:      "logsource",
+				Tag:      "loggen",
 				PID:      c.PID(),
 				Host:     c.Env.LinuxHost,
 				Facility: core.FacLocal0,

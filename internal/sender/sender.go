@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"socbyte.ai/logsource/internal/core"
+	"github.com/theshahrukh98khan/LogGen/internal/core"
 )
 
 // DialTimeout bounds how long we wait for a TCP connect.

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"socbyte.ai/logsource/internal/core"
+	"github.com/theshahrukh98khan/LogGen/internal/core"
 )
 
 // This file turns a WinEvent into the two shapes a SIEM commonly receives

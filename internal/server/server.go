@@ -12,10 +12,10 @@ import (
 	"sync"
 	"time"
 
-	"socbyte.ai/logsource/internal/catalog"
-	"socbyte.ai/logsource/internal/core"
-	"socbyte.ai/logsource/internal/sender"
-	"socbyte.ai/logsource/internal/store"
+	"github.com/theshahrukh98khan/LogGen/internal/catalog"
+	"github.com/theshahrukh98khan/LogGen/internal/core"
+	"github.com/theshahrukh98khan/LogGen/internal/sender"
+	"github.com/theshahrukh98khan/LogGen/internal/store"
 )
 
 // maxBurst caps how many records a single request may emit, so a stray zero in

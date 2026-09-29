@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"socbyte.ai/logsource/internal/core"
+	"github.com/theshahrukh98khan/LogGen/internal/core"
 )
 
 // Nginx and Apache controls.

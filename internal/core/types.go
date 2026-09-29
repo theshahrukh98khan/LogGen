@@ -1,4 +1,4 @@
-// Package core holds the shared types used across LogSource: the simulated
+// Package core holds the shared types used across LogGen: the simulated
 // estate (Env), the SIEM targets (Profile), and the catalog contract that each
 // log source (Windows, Linux, Nginx, Apache) plugs into.
 package core
@@ -18,8 +18,8 @@ import (
 // one place is what makes a Windows logon, a sudo call and an Nginx hit look
 // like they came from the same organisation.
 type Env struct {
-	Domain    string `json:"domain"`    // socbyte.local
-	NetBIOS   string `json:"netbios"`   // SOCBYTE
+	Domain    string `json:"domain"`    // corp.local
+	NetBIOS   string `json:"netbios"`   // CORP
 	WinHost   string `json:"winHost"`   // WIN-DC01
 	LinuxHost string `json:"linuxHost"` // ubuntu-app01
 	WebHost   string `json:"webHost"`   // web-prod01
@@ -29,8 +29,8 @@ type Env struct {
 // DefaultEnv is the estate a fresh install starts with.
 func DefaultEnv() Env {
 	return Env{
-		Domain:    "socbyte.local",
-		NetBIOS:   "SOCBYTE",
+		Domain:    "corp.local",
+		NetBIOS:   "CORP",
 		WinHost:   "WIN-DC01",
 		LinuxHost: "ubuntu-app01",
 		WebHost:   "web-prod01",
