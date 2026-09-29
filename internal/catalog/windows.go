@@ -289,6 +289,7 @@ func registerWindowsAuth() {
 			actor := c.P("actor", c.User())
 			target := c.P("user", c.AdminUser())
 			server := c.P("target", c.Workstation())
+			srcIP := c.InternalIP()
 
 			e := secEvent(c, "4648", "12544", "Logon", core.AuditSuccess, 2)
 			e.User = c.Env.NetBIOS + `\` + actor
@@ -306,14 +307,14 @@ func registerWindowsAuth() {
 				kv("Process ID", fmt.Sprintf("0x%s", c.Hex(4))),
 				kv("Process Name", `C:\Windows\System32\runas.exe`), "",
 				"Network Information:",
-				kv("Network Address", c.InternalIP()),
+				kv("Network Address", srcIP),
 				kv("Port", fmt.Sprint(c.EphemeralPort())),
 			)
 			e.EventData = map[string]string{
 				"subjectUserName": actor, "subjectDomainName": c.Env.NetBIOS,
 				"targetUserName": target, "targetDomainName": c.Env.NetBIOS,
 				"targetServerName": server, "processName": `C:\Windows\System32\runas.exe`,
-				"ipAddress": c.InternalIP(),
+				"ipAddress": srcIP,
 			}
 			return winPayload(c, e, core.SevNotice)
 		},
@@ -788,14 +789,15 @@ func registerWindowsExecution() {
 				Criticality: 3, RecordID: c.Int(10000, 99999),
 				ProcessID: c.Int(500, 9000), ThreadID: c.Int(1000, 9000),
 			}
+			blockID := strings.Trim(c.GUID(), "{}")
 			e.Message = lines(
 				"Creating Scriptblock text (1 of 1):",
 				script, "",
-				"ScriptBlock ID: "+strings.Trim(c.GUID(), "{}"),
+				"ScriptBlock ID: "+blockID,
 				"Path: ",
 			)
 			e.EventData = map[string]string{
-				"scriptBlockText": script, "scriptBlockId": strings.Trim(c.GUID(), "{}"),
+				"scriptBlockText": script, "scriptBlockId": blockID,
 				"messageNumber": "1", "messageTotal": "1",
 			}
 			return winPayload(c, e, core.SevWarning)
