@@ -257,3 +257,78 @@ func TestTCPFraming(t *testing.T) {
 		t.Errorf("UDP framing altered the payload: %q", got)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Destination name resolution
+// ---------------------------------------------------------------------------
+
+// A destination may be named rather than numbered. An address needs no lookup,
+// and saying so lets the console skip reporting what it "resolved to".
+func TestResolveAcceptsAnAddress(t *testing.T) {
+	for _, host := range []string{"127.0.0.1", "10.20.30.5", "::1"} {
+		got := Resolve(core.Profile{Host: host, Port: 514})
+		if got.Failed {
+			t.Errorf("Resolve(%q) failed: %s", host, got.Message)
+		}
+		if !got.IsIP {
+			t.Errorf("Resolve(%q) should not need a lookup", host)
+		}
+		if len(got.Addrs) != 1 {
+			t.Errorf("Resolve(%q) returned %d addresses, want 1", host, len(got.Addrs))
+		}
+	}
+}
+
+func TestResolveLooksUpAName(t *testing.T) {
+	got := Resolve(core.Profile{Host: "localhost", Port: 514})
+	if got.Failed {
+		t.Fatalf("localhost did not resolve: %s", got.Message)
+	}
+	if got.IsIP {
+		t.Error("a name should be reported as needing a lookup")
+	}
+	if len(got.Addrs) == 0 {
+		t.Error("no addresses returned for localhost")
+	}
+}
+
+// A name that does not resolve must be reported as a resolution failure, not
+// left for the dialler to report as a connection problem: the two have
+// different fixes and the advice differs.
+func TestResolveReportsAnUnknownName(t *testing.T) {
+	got := Resolve(core.Profile{Host: "siem.invalid.example", Port: 514})
+	if !got.Failed {
+		t.Fatal("an unresolvable name was reported as fine")
+	}
+	if got.Message == "" {
+		t.Error("no reason given for the failure")
+	}
+	if got.IsIP {
+		t.Error("a name was misreported as an address")
+	}
+}
+
+// Whitespace around a pasted hostname must not defeat the lookup.
+func TestResolveTrimsTheHost(t *testing.T) {
+	got := Resolve(core.Profile{Host: "  localhost  ", Port: 514})
+	if got.Failed {
+		t.Errorf("a padded hostname failed to resolve: %s", got.Message)
+	}
+	if got.Host != "localhost" {
+		t.Errorf("Host = %q, want it trimmed", got.Host)
+	}
+}
+
+// Addr has to bracket an IPv6 literal, or a dial to it fails.
+func TestNamedDestinationAddr(t *testing.T) {
+	for _, tc := range []struct{ host, want string }{
+		{"wazuh.corp.local", "wazuh.corp.local:514"},
+		{"10.20.30.5", "10.20.30.5:514"},
+		{"::1", "[::1]:514"},
+	} {
+		got := core.Profile{Host: tc.host, Port: 514}.Addr()
+		if got != tc.want {
+			t.Errorf("Addr(%q) = %q, want %q", tc.host, got, tc.want)
+		}
+	}
+}

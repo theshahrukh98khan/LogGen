@@ -3,6 +3,7 @@
 package sender
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -192,4 +193,54 @@ func Probe(pr core.Profile) error {
 		return err
 	}
 	return c.Close()
+}
+
+// ---------------------------------------------------------------------------
+// Name resolution
+// ---------------------------------------------------------------------------
+
+// Resolution describes what a destination's host turned out to be.
+//
+// A destination may be named rather than numbered, and the two fail in
+// different ways. A name that does not resolve is a DNS problem, where advice
+// about firewalls and listening ports is useless and misleading. Resolving
+// separately from dialling lets the console say which of the two went wrong,
+// and show which address a name actually points at — worth knowing when DNS is
+// stale or a name carries several records.
+type Resolution struct {
+	Host    string   `json:"host"`              // what the operator typed
+	IsIP    bool     `json:"isIp"`              // true when no lookup was needed
+	Addrs   []string `json:"addrs,omitempty"`   // what the name resolved to
+	Failed  bool     `json:"failed"`            // the name could not be resolved
+	Message string   `json:"message,omitempty"` // why, when Failed
+}
+
+// Resolve looks up a destination's host without connecting to it.
+func Resolve(pr core.Profile) Resolution {
+	host := strings.TrimSpace(pr.Host)
+	r := Resolution{Host: host}
+
+	if ip := net.ParseIP(host); ip != nil {
+		r.IsIP = true
+		r.Addrs = []string{ip.String()}
+		return r
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), DialTimeout)
+	defer cancel()
+
+	ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	if err != nil {
+		r.Failed = true
+		r.Message = err.Error()
+		return r
+	}
+	for _, a := range ips {
+		r.Addrs = append(r.Addrs, a.IP.String())
+	}
+	if len(r.Addrs) == 0 {
+		r.Failed = true
+		r.Message = "the name resolved to no addresses"
+	}
+	return r
 }

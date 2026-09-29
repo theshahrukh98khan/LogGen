@@ -210,7 +210,9 @@
           <input type="hidden" id="pf_id">
           <div class="form-grid">
             <label>Name<input id="pf_name" required placeholder="Wazuh manager"></label>
-            <label>Host or IP<input id="pf_host" required placeholder="192.168.18.20"></label>
+            <label>Host name or IP <span class="opt">wazuh.corp.local or 192.168.18.20</span>
+              <input id="pf_host" required placeholder="wazuh.corp.local">
+            </label>
             <label>Port<input id="pf_port" type="number" min="1" max="65535" value="514" required></label>
             <label>Protocol
               <select id="pf_protocol">
