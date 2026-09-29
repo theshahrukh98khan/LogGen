@@ -28,6 +28,9 @@ const activityCap = 400
 
 // Server wires the store, the catalog and the web console together.
 type Server struct {
+	// Version is reported by the console's About page. Set by main after New.
+	Version string
+
 	st  *store.Store
 	web fs.FS
 
@@ -99,6 +102,8 @@ func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
 		"controls": s.allControls(),
 		"customs":  s.st.Customs(),
 		"sources":  s.sources(),
+		"version":  s.Version,
+		"dataDir":  s.st.Path(),
 	})
 }
 

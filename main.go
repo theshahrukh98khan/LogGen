@@ -91,9 +91,12 @@ func main() {
 		log.Fatalf("mount web assets: %v", err)
 	}
 
+	console := server.New(st, webRoot)
+	console.Version = buildVersion()
+
 	srv := &http.Server{
 		Addr:              *addr,
-		Handler:           server.New(st, webRoot).Handler(),
+		Handler:           console.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

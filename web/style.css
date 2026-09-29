@@ -92,7 +92,6 @@ p { margin: 0; }
 .eyebrow,
 .panel-head h2,
 .rail h4,
-.admin-tabs .tab,
 .sev-chip,
 .tag {
   font-family: var(--mono);
@@ -857,23 +856,90 @@ input:focus, select:focus, textarea:focus {
   display: flex; align-items: flex-start; justify-content: space-between;
   gap: 16px; flex-wrap: wrap;
 }
+.admin-head h2:focus { outline: none; }
 .admin-head h2 { font-size: 20px; font-family: var(--mono); letter-spacing: -.02em; }
 .admin-head .sub { color: var(--dim); font-size: 13px; margin-top: 2px; }
 
-.admin-tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+/* The administration hub. Section headings with a rule beneath, and a row of
+   icon tiles under each, so every configurable area is visible at once rather
+   than one tab at a time. */
+.hub { display: flex; flex-direction: column; gap: 22px; padding-top: 2px; }
 
-.admin-tabs .tab {
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--faint);
-  font-size: 10.5px;
-  padding: 8px 12px;
-  cursor: pointer;
-  margin-bottom: -1px;
+.hub-group h3 {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--dim);
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--line);
 }
-.admin-tabs .tab:hover { color: var(--text); }
-.admin-tabs .tab.active { color: var(--signal); border-bottom-color: var(--signal); }
+
+.hub-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-top: 8px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 118px;
+  padding: 16px 8px 14px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.35;
+  text-align: center;
+  cursor: pointer;
+  transition: background .12s, border-color .12s, transform .12s;
+}
+.tile span { display: block; min-height: 2.7em; }
+.tile svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: var(--signal);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform .12s;
+}
+.tile:hover { background: var(--panel); border-color: var(--line); }
+.tile:hover svg { transform: translateY(-2px); }
+.tile:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.tile:active { transform: translateY(1px); }
+
+/* Back out of a panel to the hub. */
+.back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 2px;
+  background: none;
+  border: 0;
+  color: var(--dim);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.back::before { content: "←"; font-size: 15px; }
+.back:hover { color: var(--signal); }
+.back:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; border-radius: 4px; }
+
+/* About page facts. */
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: 10px 22px; margin: 18px 0 20px; }
+.facts dt { color: var(--dim); font-size: 12.5px; }
+.facts dd { font-family: var(--mono); font-size: 12.5px; word-break: break-all; }
 
 .admin-grid {
   display: grid;

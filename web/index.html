@@ -97,17 +97,75 @@
 <section id="adminView" class="admin hidden">
   <div class="admin-head">
     <div>
-      <h2 id="adminTitle">Destinations</h2>
-      <p class="sub" id="adminSub">Where LogGen sends records</p>
+      <h2 id="adminTitle" tabindex="-1">Administration</h2>
+      <p class="sub" id="adminSub">Everything LogGen lets you configure</p>
     </div>
     <button id="btnCloseAdmin" class="btn primary">Done</button>
   </div>
 
-  <div class="admin-tabs">
-    <button class="tab active" data-admin="profiles">Destinations</button>
-    <button class="tab" data-admin="customs">Log sources &amp; controls</button>
-    <button class="tab" data-admin="estate">Simulated estate</button>
+  <!-- The landing grid. Every configurable part of LogGen is on this one
+       screen, grouped by what it affects, so nothing is hidden behind a tab
+       an operator has to think to click. -->
+  <div id="adminHub" class="hub">
+
+    <section class="hub-group">
+      <h3>Destinations</h3>
+      <div class="hub-tiles">
+        <button class="tile" data-admin="profiles">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>
+          </svg>
+          <span>SIEM targets</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="hub-group">
+      <h3>Log sources</h3>
+      <div class="hub-tiles">
+        <button class="tile" data-admin="customs">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 3 3 7.5l9 4.5 9-4.5z"/><path d="M3 12.5 12 17l9-4.5"/><path d="M3 17.5 12 22l9-4.5"/>
+          </svg>
+          <span>Custom controls</span>
+        </button>
+        <button class="tile" data-admin="tokens">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m9 8-5 4 5 4"/><path d="m15 8 5 4-5 4"/>
+          </svg>
+          <span>Placeholders</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="hub-group">
+      <h3>Environment</h3>
+      <div class="hub-tiles">
+        <button class="tile" data-admin="estate">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 21V6l7-3v18"/><path d="M11 10h9v11"/><path d="M2 21h20"/>
+            <path d="M7 8v0M7 12v0M7 16v0M15 14v0M15 18v0"/>
+          </svg>
+          <span>Simulated estate</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="hub-group">
+      <h3>System</h3>
+      <div class="hub-tiles">
+        <button class="tile" data-admin="about">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8v0"/>
+          </svg>
+          <span>About</span>
+        </button>
+      </div>
+    </section>
+
   </div>
+
+  <button id="adminBack" class="back hidden">Administration</button>
 
   <!-- ---------- Custom controls ---------- -->
   <div id="adminCustoms" class="admin-panel hidden">
@@ -196,7 +254,7 @@
   </div>
 
   <!-- ---------- Destinations ---------- -->
-  <div id="adminProfiles" class="admin-panel">
+  <div id="adminProfiles" class="admin-panel hidden">
     <div class="admin-grid">
       <div class="panel pad">
         <h3>Destinations</h3>
@@ -286,6 +344,36 @@
           <button type="submit" class="btn primary">Save estate</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ---------- Placeholder reference ---------- -->
+  <div id="adminTokens" class="admin-panel hidden">
+    <div class="panel pad narrow">
+      <h3>Placeholders</h3>
+      <p class="hint">
+        Tokens you can use in a custom control's template, hostname or
+        parameter default. Anything in braces that is not on this list and is
+        not a parameter you declared is left in the record as typed, so a
+        mistyped token is visible rather than silent.
+      </p>
+      <div id="placeholderRef" class="token-grid"></div>
+    </div>
+  </div>
+
+  <!-- ---------- About ---------- -->
+  <div id="adminAbout" class="admin-panel hidden">
+    <div class="panel pad narrow">
+      <h3>About LogGen</h3>
+      <p class="hint">
+        A log simulation lab. It generates correctly structured records for
+        common log sources and ships them over syslog, so parsers, decoders and
+        detection rules can be exercised without a real estate behind them.
+      </p>
+      <dl id="aboutFacts" class="facts"></dl>
+      <p class="hint">
+        The console has no authentication. Keep it on the lab network.
+      </p>
     </div>
   </div>
 </section>
