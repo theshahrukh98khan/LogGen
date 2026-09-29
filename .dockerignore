@@ -1,0 +1,22 @@
+# Keep the build context to what the compiler actually needs.
+.git
+.github
+.gitignore
+dist/
+data/
+packaging/
+Makefile
+README.md
+LICENSE
+Dockerfile
+.dockerignore
+
+# Build output and local test artefacts
+loggen
+loggen.exe
+*.exe
+*.out
+*.err
+*.log
+*.png
+qa-*
