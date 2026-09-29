@@ -7,7 +7,56 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="signed-out">
+
+<!-- Sign-in. Rendered before anything else and removed once a session exists,
+     so the console is never briefly visible to somebody who cannot use it. -->
+<section id="authView" class="auth hidden">
+  <div class="auth-box">
+    <div class="auth-mark"><span class="logo">LG</span><h1>LogGen</h1></div>
+
+    <form id="loginForm" class="auth-form">
+      <h2>Sign in</h2>
+      <p class="auth-sub">The console sends records to your SIEM and holds every destination you have configured.</p>
+
+      <label>Username
+        <input id="au_user" autocomplete="username" required autocapitalize="off"
+               spellcheck="false" value="admin">
+      </label>
+      <label>Password
+        <input id="au_pass" type="password" autocomplete="current-password" required>
+      </label>
+
+      <p id="au_error" class="auth-error hidden" role="alert"></p>
+      <p id="au_hint" class="auth-hint hidden"></p>
+
+      <button type="submit" id="au_submit" class="btn primary wide">Sign in</button>
+      <button type="button" id="au_forgot" class="linkish hidden">Forgotten your password?</button>
+    </form>
+
+    <!-- Asking for a reset link. -->
+    <form id="forgotForm" class="auth-form hidden">
+      <h2>Reset your password</h2>
+      <p class="auth-sub">A link goes to the recovery address set on this console. It is good for 30 minutes.</p>
+      <label>Username<input id="fg_user" autocapitalize="off" spellcheck="false" required></label>
+      <p id="fg_note" class="auth-hint hidden"></p>
+      <button type="submit" class="btn primary wide">Send the link</button>
+      <button type="button" id="fg_back" class="linkish">Back to sign in</button>
+    </form>
+
+    <!-- Following a reset link. -->
+    <form id="resetForm" class="auth-form hidden">
+      <h2>Choose a new password</h2>
+      <p class="auth-sub">This link works once. Setting a password signs out every other session.</p>
+      <label>New password<input id="rs_pass" type="password" autocomplete="new-password" required></label>
+      <label>Repeat it<input id="rs_pass2" type="password" autocomplete="new-password" required></label>
+      <p id="rs_error" class="auth-error hidden" role="alert"></p>
+      <button type="submit" class="btn primary wide">Set password</button>
+    </form>
+
+    <p class="auth-foot">Served over plain HTTP. Keep this console on a network you trust.</p>
+  </div>
+</section>
 
 <header class="topbar">
   <a class="brand" id="brandHome" href="#" title="Back to Send">
@@ -23,8 +72,17 @@
   <div class="topbar-right">
     <kbd class="kbd-hint" id="kbdHint">/</kbd>
     <span class="kbd-label">to search</span>
+    <span class="who" id="whoAmI"></span>
+    <button id="btnSignOut" class="btn small">Sign out</button>
   </div>
 </header>
+
+<!-- Shown until the shipped credentials are changed. -->
+<div id="defaultCreds" class="stale warn hidden" role="status">
+  <span>This console still signs in with the default <b>admin / admin</b>.
+    Anyone who can reach it can send records to your SIEM.</span>
+  <button id="btnFixCreds" class="btn small primary">Change it</button>
+</div>
 
 <!-- Shown when the binary serving this page is not the one it loaded from. -->
 <div id="stale" class="stale hidden" role="status">
@@ -147,6 +205,25 @@
             <path d="M7 8v0M7 12v0M7 16v0M15 14v0M15 18v0"/>
           </svg>
           <span>Simulated estate</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="hub-group">
+      <h3>Access</h3>
+      <div class="hub-tiles">
+        <button class="tile" data-admin="signin">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="10.5" width="16" height="10" rx="2"/>
+            <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/><path d="M12 14.5v2"/>
+          </svg>
+          <span>Sign-in</span>
+        </button>
+        <button class="tile" data-admin="recovery">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/>
+          </svg>
+          <span>Recovery</span>
         </button>
       </div>
     </section>
@@ -372,8 +449,76 @@
       </p>
       <dl id="aboutFacts" class="facts"></dl>
       <p class="hint">
-        The console has no authentication. Keep it on the lab network.
+        The console is served over plain HTTP, so a session cookie crosses the
+        network in the clear. Keep it on a network you trust.
       </p>
+    </div>
+  </div>
+
+  <!-- ---------- Sign-in ---------- -->
+  <div id="adminSignin" class="admin-panel hidden">
+    <div class="panel pad narrow">
+      <h3>Sign-in</h3>
+      <p class="hint">
+        Change the username, the password, or both. The current password is
+        always required, so a console left open on an unlocked screen cannot be
+        turned into a permanent takeover. Saving signs out every other session.
+      </p>
+      <form id="signinForm" class="form">
+        <div class="form-grid">
+          <label>Current password <span class="opt">required</span>
+            <input id="si_current" type="password" autocomplete="current-password" required>
+          </label>
+          <label>Username<input id="si_user" autocapitalize="off" spellcheck="false"></label>
+          <label>New password <span class="opt">blank = leave it alone</span>
+            <input id="si_pass" type="password" autocomplete="new-password">
+          </label>
+          <label>Repeat new password<input id="si_pass2" type="password" autocomplete="new-password"></label>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn primary">Save sign-in</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ---------- Recovery ---------- -->
+  <div id="adminRecovery" class="admin-panel hidden">
+    <div class="panel pad narrow">
+      <h3>Password recovery</h3>
+      <p class="hint">
+        With a recovery address and a mail server, a forgotten password can be
+        reset from the sign-in page. Without them, the way back in is
+        <code>loggen -reset-auth</code> on this machine, which returns the
+        account to admin / admin.
+      </p>
+      <form id="recoveryForm" class="form">
+        <div class="form-grid">
+          <label>Recovery address <span class="opt">where the reset link goes</span>
+            <input id="rc_email" type="email" placeholder="you@example.com">
+          </label>
+        </div>
+
+        <h4>Mail server</h4>
+        <div class="form-grid">
+          <label>Host<input id="rc_host" placeholder="smtp.example.com"></label>
+          <label>Port <span class="opt">587 STARTTLS, 465 TLS</span>
+            <input id="rc_port" type="number" min="1" max="65535" placeholder="587">
+          </label>
+          <label>From address<input id="rc_from" placeholder="loggen@example.com"></label>
+          <label>Username <span class="opt">optional</span><input id="rc_user" autocomplete="off"></label>
+          <label>Password <span class="opt" id="rc_pwnote">optional</span>
+            <input id="rc_pass" type="password" autocomplete="new-password">
+          </label>
+        </div>
+        <p class="hint">
+          TLS is required, not preferred. A server that does not offer STARTTLS
+          is refused rather than sending a reset link in the clear.
+        </p>
+        <div class="form-actions">
+          <button type="submit" class="btn primary">Save recovery</button>
+        </div>
+      </form>
     </div>
   </div>
 </section>
@@ -416,6 +561,7 @@
 
 <div id="toast" class="toast hidden"></div>
 
+<script src="auth.js"></script>
 <script src="app.js"></script>
 <script src="admin.js"></script>
 </body>

@@ -291,17 +291,18 @@ New-NetFirewallRule -DisplayName "LogGen console" -Direction Inbound `
 Use `-Profile Private,Public` only if the network you are on is classified as
 Public and you accept that. Check with `Get-NetConnectionProfile`.
 
-> **The console has no authentication and will send syslog traffic to any host
-> you point it at.** Anyone who can reach the port can drive it. Keep it on a
+> **The console signs in with `admin` / `admin` until you change it, and is
+> served over plain HTTP.** Change the password once you are in, keep it on a
 > network you control, and use `-addr 127.0.0.1:8088` when you do not need
-> access from another machine.
+> access from another machine. See [Signing in](#signing-in).
 
 | Flag | Default | Meaning |
 |---|---|---|
 | `-addr` | `0.0.0.0:8088` | Console listen address |
-| `-data` | `data` | Directory holding `profiles.json` |
+| `-data` | `data` | Directory holding `profiles.json` and `auth.json` |
 | `-open` | `true` | Open a browser on start |
 | `-sink` | *(off)* | Run as a syslog receiver instead, e.g. `-sink :5514` |
+| `-reset-auth` | | Reset the sign-in to `admin` / `admin` and exit |
 | `-version` | | Print the version and exit |
 
 LogGen shuts down cleanly on Ctrl+C or `SIGTERM`, letting in-flight requests
@@ -318,6 +319,79 @@ The same binary can play collector. In one terminal:
 
 In another, start the console, add a profile pointing at `127.0.0.1:5514`, and
 click a control. The sink prints exactly what arrived.
+
+## Signing in
+
+The console signs in with **`admin` / `admin`** on a fresh install. Change it
+once you are in, under **Administration > Sign-in**. The console says so on
+the sign-in page and in the startup log until you do, and a red bar sits across
+the top of the workspace for as long as the shipped password is in place.
+
+Everything except the sign-in endpoints is behind that session. A destination
+names your SIEM and a send puts records on it, so neither is readable without
+one.
+
+### What it does and does not protect
+
+The console is served over plain **HTTP**. The session cookie is `HttpOnly` and
+`SameSite=Lax`, but it crosses the network in the clear, so anyone able to read
+traffic between your browser and LogGen can take the session. This is a lab
+tool: keep it on a network you trust, and treat the sign-in as something that
+stops a colleague or a stray scanner rather than as a security boundary.
+
+Passwords are stored as PBKDF2-HMAC-SHA256 with a per-password random salt at
+210,000 iterations, in `data/auth.json`, written owner-only. The work factor is
+stored with each hash, so raising it later does not invalidate existing
+passwords.
+
+### Too many attempts
+
+Five wrong passwords inside a minute lock the account for ten minutes. The
+sign-in page counts the wait down rather than just refusing, and warns on the
+third attempt rather than only after the lock. The correct password does not
+get in during a lock.
+
+The count is held in memory, so restarting LogGen clears it. Anyone who can
+restart the process already has a shell on the host and could read the config
+directly, so the lockout is not what stands between them and your destinations.
+What it stops is guessing over the network.
+
+### Forgetting the password
+
+Set a recovery address and a mail server under **Administration > Recovery**,
+and the sign-in page offers a reset link valid for 30 minutes. The link works
+once: setting a password invalidates it, along with every other session.
+
+TLS is required rather than preferred. A mail server that does not offer
+STARTTLS is refused rather than sending a reset link in the clear. Port 465 is
+treated as implicit TLS.
+
+Without a mail server configured, the way back in is on the machine itself:
+
+```sh
+loggen -reset-auth
+```
+
+That returns the account to `admin` / `admin` and keeps the recovery settings.
+It needs a shell on the host, which is a higher bar than knowing the password,
+so it is not a way around the sign-in.
+
+### Scripts and automation
+
+`scripts/start.ps1` and `scripts/start.sh` sign in to configure the sink
+destination. Pass the credentials if you have changed them:
+
+```powershell
+.\scripts\start.ps1 -WithSink -User admin -Password 'your password'
+```
+
+```sh
+./scripts/start.sh --with-sink --user admin --password 'your password'
+```
+
+The browser suite does the same. A fresh install is moved onto its own test
+password on the first run, because the shipped password is five characters and
+the policy floor is eight, so `admin` cannot be restored once changed.
 
 ## Target profiles
 
@@ -594,6 +668,24 @@ rule correlating the description against the extracted fields will silently fail
 | `POST` | `/api/profiles/{id}/test` | Probe connectivity |
 | `POST` | `/api/preview` | Render a control without sending |
 | `POST` | `/api/send` | Render and send |
+
+Every route above requires a session and answers `401` without one. These five
+do not, because the sign-in page needs them:
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/auth/state` | Whether this caller is signed in |
+| `POST` | `/api/auth/login` | Sign in, sets the session cookie |
+| `POST` | `/api/auth/logout` | Sign out |
+| `POST` | `/api/auth/forgot` | Ask for a reset link |
+| `POST` | `/api/auth/reset` | Set a password from a reset link |
+
+Changing the account is itself behind the session:
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/auth/change` | Change username or password, current password required |
+| `PUT` | `/api/auth/recovery` | Set the recovery address and mail server |
 
 `/api/send` takes `{controlId, profileId, params, count, delayMs}`. A single
 record is sent inline and returns the result; a burst returns `202` and reports

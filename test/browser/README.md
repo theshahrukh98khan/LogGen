@@ -36,8 +36,14 @@ back.
 BASE=http://127.0.0.1:9000 npm test
 ```
 
-The suite creates a custom control on a source called `browsertest` and deletes
-it again, so point it at a throwaway data directory rather than one you care
-about.
+The console signs in now, so the suite does too. A fresh data directory starts
+at `admin` / `admin`; the suite moves it onto its own password on the first run,
+because the shipped password is shorter than the policy floor and cannot be set
+back. Override with `LOGGEN_USER` and `LOGGEN_PASSWORD` if you point it at an
+install whose credentials you have already changed.
+
+The suite also creates a custom control on a source called `browsertest` and
+deletes it again, and its last section deliberately locks the account for ten
+minutes. Point it at a throwaway data directory rather than one you care about.
 
 CI runs this on every push; see `.github/workflows/ci.yml`.

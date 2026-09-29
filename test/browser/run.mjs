@@ -28,12 +28,128 @@ const page = await browser.newPage({ viewport: { width: 1500, height: 950 } });
 
 const errors = [], failedRequests = [];
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
-page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
+page.on('console', (m) => {
+  if (m.type() !== 'error') return;
+  // "Failed to load resource" is the browser noting a non-2xx response. This
+  // suite drives a great many on purpose, checking that the API refuses an
+  // unauthenticated caller, a wrong password, a short one, a forged reset
+  // link. Each is asserted directly where it happens, so counting them here
+  // as well only makes this check fail for doing its job. These events also
+  // arrive well after the call that caused them, which defeats any attempt to
+  // filter them by when they happened. Real breakage still lands: a thrown
+  // exception arrives as pageerror, a request that never completes as
+  // requestfailed, and anything else the console logs is still counted.
+  if (/Failed to load resource/.test(m.text())) return;
+  errors.push(`console: ${m.text()}`);
+});
 page.on('requestfailed', (r) => failedRequests.push(`${r.method()} ${r.url()}`));
 
+// The console requires a session now, so the suite signs in before anything
+// else.
+//
+// A fresh install is admin/admin, but the shipped password is five characters
+// and the policy floor is eight, so it cannot be restored once changed. Rather
+// than fight that, the suite moves a fresh install onto a known test password
+// on its first run and uses that from then on, which leaves it re-runnable
+// against the same data directory.
+const USER = process.env.LOGGEN_USER || 'admin';
+const PASSWORD = process.env.LOGGEN_PASSWORD || 'loggen-browser-tests';
+
 await page.goto(BASE, { waitUntil: 'networkidle' });
+await page.waitForTimeout(600);
+
+// ---------------------------------------------------------------------------
+section('Authentication');
+
+ck('the console is behind a sign-in', await page.locator('#authView').isVisible());
+ck('the workspace is not rendered to a stranger',
+  !(await page.locator('#simView').isVisible()));
+
+// Nothing that names the SIEM or puts records on the wire may answer without
+// a session. This is the check that matters most in this whole file.
+const unguarded = await page.evaluate(async () => {
+  const probes = [
+    ['GET', '/api/state'], ['GET', '/api/profiles'], ['GET', '/api/controls'],
+    ['GET', '/api/customs'], ['GET', '/api/activity'], ['GET', '/api/placeholders'],
+    ['PUT', '/api/env'], ['POST', '/api/send'], ['POST', '/api/preview'],
+    ['POST', '/api/profiles'], ['POST', '/api/auth/change'],
+  ];
+  const open = [];
+  for (const [method, path] of probes) {
+    const r = await fetch(path, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: method === 'GET' ? undefined : '{}',
+    });
+    if (r.status !== 401) open.push(`${method} ${path} -> ${r.status}`);
+  }
+  return open;
+});
+ck('every API refuses an unauthenticated caller', unguarded.length === 0, unguarded.join(', '));
+
+// A wrong password must not say which half was wrong, or the endpoint becomes
+// a way to discover the username.
+const wrongUser = await page.evaluate(async () => {
+  const r = await fetch('/api/auth/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user: 'nobody-by-that-name', password: 'whatever' }),
+  });
+  return (await r.json()).error;
+});
+const wrongPass = await page.evaluate(async (u) => {
+  const r = await fetch('/api/auth/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user: u, password: 'definitely-not-it' }),
+  });
+  return (await r.json()).error;
+}, USER);
+ck('a bad username and a bad password read the same', wrongUser === wrongPass,
+  `${wrongUser} vs ${wrongPass}`);
+
+// Move a fresh install off the shipped credentials, so the rest of the suite
+// has a password that satisfies the policy.
+const wasFresh = await page.evaluate(async (pw) => {
+  const login = (p) => fetch('/api/auth/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user: 'admin', password: p }),
+  });
+  // Probing leaves a session behind either way, so it is always cleared: the
+  // suite signs in through the form next, and it cannot do that if it is
+  // already signed in.
+  let fresh = false;
+  if (!(await login(pw)).ok) {
+    if (!(await login('admin')).ok) throw new Error('neither the default nor the test password works');
+    const r = await fetch('/api/auth/change', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ current: 'admin', password: pw }),
+    });
+    if (!r.ok) throw new Error('could not move off the default password');
+    fresh = true;
+  }
+  await fetch('/api/auth/logout', { method: 'POST' });
+  return fresh;
+}, PASSWORD);
+if (wasFresh) console.log('  ..    moved this install off admin/admin');
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(600);
+
+// Sign in through the form, the way a person does.
+await page.fill('#au_user', USER);
+await page.fill('#au_pass', PASSWORD);
+await page.click('#au_submit');
 await page.waitForSelector('.card', { timeout: 15000 });
-await page.waitForTimeout(1500);
+await page.waitForTimeout(1200);
+
+ck('signing in reveals the console', await page.locator('#simView').isVisible());
+ck('the sign-in page is gone', !(await page.locator('#authView').isVisible()));
+ck('the signed-in account is named',
+  (await page.locator('#whoAmI').textContent()).trim().length > 0);
+
+// The session cookie must not be readable from script, or an injected string
+// anywhere in the console would be enough to steal it.
+ck('the session cookie is not visible to script',
+  !(await page.evaluate(() => document.cookie.includes('loggen_session'))),
+  await page.evaluate(() => document.cookie));
 
 // ---------------------------------------------------------------------------
 section('Catalogue renders');
@@ -228,9 +344,11 @@ ck('discard did not save the edit',
   (await page.inputValue('#ev_domain')) === realDomain,
   await page.inputValue('#ev_domain'));
 
-// Save writes it, then leaves. Put the real value back afterwards so the rest
-// of the suite sees the estate it expects.
-await page.fill('#ev_domain', 'guard-test.example');
+// Save writes it, then leaves. The value is stamped, because a fixed one that
+// a previous run left behind would make this fill a no-op, the form clean, and
+// the whole check pass by never asking anything.
+const guardDomain = `guard-${Date.now()}.example`;
+await page.fill('#ev_domain', guardDomain);
 await page.click('#adminBack');
 await page.waitForTimeout(300);
 await page.click('#dlg_save');
@@ -238,17 +356,16 @@ await page.waitForTimeout(700);
 ck('save leaves the panel once it has written',
   (await page.locator('#adminHub').isVisible()) &&
   !(await page.locator('#dialog').isVisible()));
-const saved = await (await fetch(`${BASE}/api/state`)).json();
-ck('save actually persisted the edit', saved.env.domain === 'guard-test.example',
-  saved.env.domain);
+const saved = await page.evaluate(async () => (await (await fetch('/api/state')).json()));
+ck('save actually persisted the edit', saved.env.domain === guardDomain, saved.env.domain);
 
 await page.click('[data-admin=estate]');
 await page.waitForTimeout(300);
 await page.fill('#ev_domain', realDomain);
 await page.click('#envForm button[type=submit]');
 await page.waitForTimeout(500);
-ck('the estate is back as it was',
-  (await (await fetch(`${BASE}/api/state`)).json()).env.domain === realDomain);
+ck('the estate is back as it was', await page.evaluate(async (want) =>
+  (await (await fetch('/api/state')).json()).env.domain === want, realDomain));
 await page.click('#adminBack');
 await page.waitForTimeout(300);
 await page.click('[data-view=send]');
@@ -656,9 +773,218 @@ ck('injected markup is not parsed',
   (await page.locator('.activity img, #readout img').count()) === 0);
 
 // ---------------------------------------------------------------------------
+section('Account settings');
+
+await page.click('[data-view=admin]');
+await page.waitForTimeout(300);
+ck('Administration offers a sign-in tile', (await page.locator('[data-admin=signin]').count()) === 1);
+ck('Administration offers a recovery tile', (await page.locator('[data-admin=recovery]').count()) === 1);
+
+await page.click('[data-admin=signin]');
+await page.waitForTimeout(350);
+ck('the sign-in panel opens', await page.locator('#adminSignin').isVisible());
+ck('it shows the current account',
+  (await page.inputValue('#si_user')) === USER, await page.inputValue('#si_user'));
+
+const canLogin = (pw) => page.evaluate(async (p) => {
+  const r = await fetch('/api/auth/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user: 'admin', password: p }),
+  });
+  return r.ok;
+}, pw);
+
+// The current password is what stands between an unlocked screen and a
+// permanent takeover, so a wrong one must be refused.
+await page.fill('#si_current', 'not the current password');
+await page.fill('#si_pass', 'a-much-longer-one');
+await page.fill('#si_pass2', 'a-much-longer-one');
+await page.click('#signinForm button[type=submit]');
+await page.waitForTimeout(700);
+ck('a wrong current password is refused', await canLogin(PASSWORD),
+  'the password changed despite a wrong current one');
+
+// Mismatched new passwords never reach the server.
+await page.fill('#si_current', PASSWORD);
+await page.fill('#si_pass', 'first-attempt-here');
+await page.fill('#si_pass2', 'second-attempt-here');
+await page.click('#signinForm button[type=submit]');
+await page.waitForTimeout(600);
+ck('mismatched passwords are caught',
+  /not the same/i.test(await page.locator('#toast').textContent()),
+  await page.locator('#toast').textContent());
+
+// Too short is refused by the server, whatever the form allows.
+ck('a short password is refused', await page.evaluate(async (cur) => {
+  const r = await fetch('/api/auth/change', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ current: cur, password: 'short' }),
+  });
+  return !r.ok;
+}, PASSWORD));
+
+// A real change, then straight back, so the suite can be run twice.
+const tempPassword = 'temp-' + Date.now();
+await page.fill('#si_current', PASSWORD);
+await page.fill('#si_pass', tempPassword);
+await page.fill('#si_pass2', tempPassword);
+await page.click('#signinForm button[type=submit]');
+await page.waitForTimeout(900);
+ck('the password can be changed', await canLogin(tempPassword));
+ck('the old password stops working', !(await canLogin(PASSWORD)));
+ck('the default credentials warning stays down once changed',
+  await page.locator('#defaultCreds').evaluate((e) => e.classList.contains('hidden')));
+
+// Changing the password signs out other sessions, but not the one that did it.
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(1000);
+ck('the session that made the change survives it',
+  await page.locator('#simView').isVisible());
+
+// Put it back.
+await page.click('[data-view=admin]');
+await page.waitForTimeout(300);
+await page.click('[data-admin=signin]');
+await page.waitForTimeout(350);
+await page.fill('#si_current', tempPassword);
+await page.fill('#si_pass', PASSWORD);
+await page.fill('#si_pass2', PASSWORD);
+await page.click('#signinForm button[type=submit]');
+await page.waitForTimeout(900);
+ck('the password can be set back', await canLogin(PASSWORD));
+
+// Recovery. The stored mail password is never sent back to the browser.
+await page.click('#adminBack');
+await page.waitForTimeout(250);
+await page.click('[data-admin=recovery]');
+await page.waitForTimeout(350);
+ck('the recovery panel opens', await page.locator('#adminRecovery').isVisible());
+await page.fill('#rc_email', 'soc@example.com');
+await page.fill('#rc_host', 'smtp.example.com');
+await page.fill('#rc_port', '587');
+await page.fill('#rc_from', 'loggen@example.com');
+await page.fill('#rc_pass', 'a-mail-password');
+await page.click('#recoveryForm button[type=submit]');
+await page.waitForTimeout(800);
+ck('recovery settings save',
+  (await page.evaluate(async () => (await (await fetch('/api/auth/state')).json()).recoveryEmail))
+    === 'soc@example.com');
+ck('the mail password never comes back to the browser',
+  await page.evaluate(async () => {
+    const s = await (await fetch('/api/auth/state')).json();
+    return s.smtp.hasPassword === true && s.smtp.password === undefined;
+  }));
+ck('the form says a password is stored rather than looking empty',
+  /saved/i.test(await page.locator('#rc_pwnote').textContent()));
+
+// With recovery configured, the sign-in page offers the reset link.
+await page.evaluate(() => fetch('/api/auth/logout', { method: 'POST' }));
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(800);
+ck('signing out returns to the sign-in page', await page.locator('#authView').isVisible());
+ck('the forgotten password link appears once recovery is set',
+  await page.locator('#au_forgot').isVisible());
+
+// The reset request says the same thing whatever name is given, so it cannot
+// be used to find out what the account is called.
+await page.click('#au_forgot');
+await page.waitForTimeout(300);
+await page.fill('#fg_user', 'somebody-else-entirely');
+await page.click('#forgotForm button[type=submit]');
+await page.waitForTimeout(1200);
+const noteA = (await page.locator('#fg_note').textContent()).trim();
+await page.fill('#fg_user', USER);
+await page.click('#forgotForm button[type=submit]');
+await page.waitForTimeout(1200);
+ck('a reset request does not reveal the username',
+  noteA === (await page.locator('#fg_note').textContent()).trim(), noteA);
+
+// A forged reset link is refused.
+ck('a made-up reset link is refused', await page.evaluate(async () => {
+  const r = await fetch('/api/auth/reset', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: 'not.a.real.token', password: 'long-enough-here' }),
+  });
+  return !r.ok;
+}));
+
+// Back in for the rest of the suite.
+await page.click('#fg_back');
+await page.waitForTimeout(250);
+await page.fill('#au_user', USER);
+await page.fill('#au_pass', PASSWORD);
+await page.click('#au_submit');
+await page.waitForSelector('.card', { timeout: 15000 });
+await page.waitForTimeout(800);
+ck('signed back in', await page.locator('#simView').isVisible());
+
+
+// Clear the recovery settings so a re-run starts where this one did.
+await page.evaluate(() => fetch('/api/auth/recovery', {
+  method: 'PUT', headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ email: '', smtp: { host: '', port: 0, from: '', user: '', password: '' } }),
+}));
+await page.waitForTimeout(400);
+
+// ---------------------------------------------------------------------------
+section('Sign-in throttle');
+
+// This runs last, because it deliberately locks the account for ten minutes
+// and nothing after it could sign in.
+await page.evaluate(() => fetch('/api/auth/logout', { method: 'POST' }));
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(700);
+
+const attempt = async (pw) => {
+  await page.fill('#au_user', USER);
+  await page.fill('#au_pass', pw);
+  await page.click('#au_submit');
+  await page.waitForTimeout(450);
+};
+
+// Four wrong ones warn without locking.
+for (let i = 0; i < 3; i++) await attempt('wrong-password-here');
+ck('a wrong password is reported', await page.locator('#au_error').isVisible());
+await attempt('wrong-password-here');
+ck('it warns before the lock rather than after',
+  /attempt/i.test(await page.locator('#au_hint').textContent()),
+  await page.locator('#au_hint').textContent());
+
+// The fifth locks it.
+await attempt('wrong-password-here');
+ck('five failures inside a minute lock the account',
+  /too many attempts/i.test(await page.locator('#au_error').textContent()),
+  await page.locator('#au_error').textContent());
+ck('the lock names ten minutes',
+  /10 minutes/.test(await page.locator('#au_error').textContent()),
+  await page.locator('#au_error').textContent());
+
+// The button counts the wait down rather than just failing.
+const label = await page.locator('#au_submit').textContent();
+ck('the button shows how long is left', /locked for \d+:\d\d/i.test(label), label);
+ck('the button is disabled while locked',
+  await page.locator('#au_submit').isDisabled());
+
+// The correct password must not get in during the lock, or it protects nothing.
+ck('the right password is refused while locked', await page.evaluate(async (pw) => {
+  const r = await fetch('/api/auth/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user: 'admin', password: pw }),
+  });
+  return !r.ok;
+}, PASSWORD));
+
+// A reload must not clear it either, or the lock is one keypress from useless.
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(700);
+ck('reloading does not clear the lock',
+  await page.locator('#au_submit').isDisabled(),
+  await page.locator('#au_submit').textContent());
+
+// ---------------------------------------------------------------------------
 section('Runtime');
 
-ck('no page or console errors', errors.length === 0, errors.slice(0, 3).join(' | '));
+ck('no page or console errors', errors.length === 0, JSON.stringify(errors.slice(0, 6), null, 1));
 ck('no failed requests', failedRequests.length === 0, failedRequests.slice(0, 3).join(' | '));
 
 await browser.close();

@@ -1120,3 +1120,94 @@ input:focus, select:focus, textarea:focus {
   font-size: 12.5px;
 }
 .stale span { flex: 1 1 260px; }
+
+/* ---------------------------------------------------------------------------
+   Sign-in
+   A full page rather than a modal. Nothing behind it is usable without a
+   session, so there is nothing worth showing through.
+   --------------------------------------------------------------------------- */
+
+body.signed-out > .topbar,
+body.signed-out > .targetbar,
+body.signed-out > #simView,
+body.signed-out > #adminView,
+body.signed-out > .credit,
+body.signed-out > .stale { display: none !important; }
+
+.auth {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(900px 500px at 72% -10%, rgba(255, 176, 32, .10), transparent 60%),
+    var(--ink);
+  overflow: auto;
+}
+
+.auth-box { width: min(392px, 100%); }
+
+.auth-mark {
+  display: flex; align-items: center; gap: 12px;
+  justify-content: center; margin-bottom: 26px;
+}
+.auth-mark h1 { font-family: var(--mono); font-size: 25px; letter-spacing: -.02em; }
+
+.auth-form {
+  display: flex; flex-direction: column; gap: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 26px 26px 24px;
+}
+.auth-form h2 { font-family: var(--mono); font-size: 17px; letter-spacing: -.01em; }
+.auth-sub { color: var(--dim); font-size: 12.5px; line-height: 1.5; margin-top: -6px; }
+
+.auth-form label {
+  display: flex; flex-direction: column; gap: 5px;
+  font-family: var(--mono); font-size: 10px; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--faint);
+}
+
+.btn.wide { width: 100%; justify-content: center; padding: 10px; font-size: 13.5px; }
+
+.auth-error {
+  background: rgba(255, 107, 96, .1);
+  border: 1px solid rgba(255, 107, 96, .35);
+  border-radius: 7px; padding: 9px 11px;
+  color: var(--sev-high); font-size: 12.5px; line-height: 1.45;
+}
+.auth-hint {
+  color: var(--dim); font-size: 12.5px; line-height: 1.45;
+  border-left: 2px solid var(--signal-deep); padding-left: 10px;
+}
+.auth-hint b, .auth-hint code { color: var(--signal); font-family: var(--mono); }
+
+.linkish {
+  background: none; border: 0; color: var(--dim); font: inherit; font-size: 12.5px;
+  cursor: pointer; padding: 2px; align-self: center;
+}
+.linkish:hover { color: var(--signal); }
+.linkish:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; border-radius: 4px; }
+
+.auth-foot {
+  margin-top: 18px; text-align: center;
+  color: var(--faint); font-size: 11.5px; line-height: 1.5;
+}
+
+/* Who is signed in, and the way out. */
+.who {
+  font-family: var(--mono); font-size: 11px; color: var(--dim);
+  text-transform: uppercase; letter-spacing: .08em;
+}
+
+/* The default credentials notice reuses the stale bar but reads as a warning. */
+.stale.warn {
+  background: rgba(255, 107, 96, .1);
+  border-bottom-color: rgba(255, 107, 96, .4);
+  color: var(--sev-high);
+}
+.stale.warn b { color: #FF9A92; font-family: var(--mono); }

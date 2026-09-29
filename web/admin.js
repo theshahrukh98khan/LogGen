@@ -12,6 +12,8 @@
 
 const ADMIN_COPY = {
   hub: ['Administration', 'Everything LogGen lets you configure'],
+  signin: ['Sign-in', 'The username and password for this console'],
+  recovery: ['Recovery', 'How a forgotten password gets reset'],
   profiles: ['SIEM targets', 'Where LogGen sends records'],
   customs: ['Custom controls', 'Records you define yourself'],
   tokens: ['Placeholders', 'Tokens a custom control can expand'],
@@ -20,6 +22,8 @@ const ADMIN_COPY = {
 };
 
 const ADMIN_PANELS = {
+  signin: 'adminSignin',
+  recovery: 'adminRecovery',
   profiles: 'adminProfiles',
   customs: 'adminCustoms',
   tokens: 'adminTokens',
@@ -45,6 +49,8 @@ function showAdminTab(name) {
 
   if (name === 'tokens') renderPlaceholders($('placeholderRef'));
   if (name === 'about') renderAbout();
+  if (name === 'signin') fillSigninForm();
+  if (name === 'recovery') fillRecoveryForm();
 
   // Focus the heading so a keyboard user is told where they landed instead of
   // being left on a tile that has just been hidden.
@@ -288,6 +294,16 @@ document.querySelectorAll('#mainNav .nav-item').forEach((b) => {
 
 $('staleReload').onclick = () => guard(() => location.reload());
 
+$('loginForm').onsubmit = doLogin;
+$('forgotForm').onsubmit = doForgot;
+$('resetForm').onsubmit = doReset;
+$('signinForm').onsubmit = saveSignin;
+$('recoveryForm').onsubmit = saveRecovery;
+$('btnSignOut').onclick = () => guard(doSignOut);
+$('au_forgot').onclick = () => { $('fg_user').value = $('au_user').value; showAuthForm('forgotForm'); };
+$('fg_back').onclick = () => showAuthForm('loginForm');
+$('btnFixCreds').onclick = () => { showView('admin'); showAdminTab('signin'); };
+
 $('brandHome').onclick = (e) => {
   e.preventDefault();
   guard(() => showView('send'));
@@ -397,5 +413,6 @@ $('customForm').onsubmit = async (e) => {
   } catch (err) { toast(err.message, 'bad'); }
 };
 
-// Everything is defined now, so the app can start.
-boot();
+// Everything is defined now. The gate decides between the console and the
+// sign-in page, so the workspace is never briefly visible without a session.
+gateBoot();

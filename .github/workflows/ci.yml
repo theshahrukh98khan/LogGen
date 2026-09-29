@@ -91,9 +91,13 @@ jobs:
           ./loggen -addr 127.0.0.1:8088 -open=false -data "$(mktemp -d)" > server.log 2>&1 &
           for i in $(seq 1 30); do
             sleep 1
-            if curl -sf http://127.0.0.1:8088/api/controls -o /dev/null; then break; fi
+            if curl -sf http://127.0.0.1:8088/api/auth/state -o /dev/null; then break; fi
           done
-          curl -sf -X POST http://127.0.0.1:8088/api/profiles             -H 'Content-Type: application/json'             -d '{"name":"CI sink","host":"127.0.0.1","port":5514,"protocol":"udp","isDefault":true}'
+          # The console is behind a sign-in now, so configuring the CI sink
+          # needs a session. A fresh data directory is always admin/admin; the
+          # browser suite moves it onto its own password on first run.
+          curl -sf -c jar.txt -X POST http://127.0.0.1:8088/api/auth/login             -H 'Content-Type: application/json'             -d '{"user":"admin","password":"admin"}' -o /dev/null
+          curl -sf -b jar.txt -X POST http://127.0.0.1:8088/api/profiles             -H 'Content-Type: application/json'             -d '{"name":"CI sink","host":"127.0.0.1","port":5514,"protocol":"udp","isDefault":true}'
 
       - name: Install Playwright
         working-directory: test/browser
