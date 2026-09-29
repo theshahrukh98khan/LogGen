@@ -28,11 +28,20 @@ const WriteTimeout = 5 * time.Second
 // line-oriented protocol and an embedded newline would otherwise be read by the
 // collector as the start of a second, malformed record.
 func Encode(p core.Payload, pr core.Profile, now time.Time) string {
-	msg := flatten(p.Message)
+	var msg string
+	switch {
+	case p.Win != nil && pr.WinFormat == "json":
+		msg = encodeWinJSON(p.Win, now)
+	case p.Win != nil:
+		msg = encodeWinSnare(p.Win, now)
+	default:
+		msg = flatten(p.Message)
+	}
 
-	// Some sources (web access logs against Wazuh's web-accesslog decoder) are
-	// decoded most reliably with no header at all.
-	if p.Raw || pr.Format == core.FormatRaw {
+	// Web access logs are decoded most reliably by Wazuh's web-accesslog decoder
+	// when they arrive as the bare log line, so a profile can opt into that for
+	// the web sources alone without changing how everything else is framed.
+	if p.Raw || pr.Format == core.FormatRaw || (pr.WebRaw && isWebSource(p.Kind)) {
 		return msg
 	}
 
@@ -86,6 +95,11 @@ func flatten(s string) string {
 	s = strings.ReplaceAll(s, "\n", "  ")
 	s = strings.ReplaceAll(s, "\t", " ")
 	return strings.TrimSpace(s)
+}
+
+// isWebSource reports whether a payload came from a web server.
+func isWebSource(kind string) bool {
+	return kind == core.SourceNginx || kind == core.SourceApache
 }
 
 func firstNonEmpty(values ...string) string {

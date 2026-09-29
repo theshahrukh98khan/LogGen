@@ -248,6 +248,36 @@ type Control struct {
 	Params   []Param  `json:"params,omitempty"`
 }
 
+// Windows audit outcomes, as they appear in the Snare EventLogType field.
+const (
+	AuditSuccess = "Success Audit"
+	AuditFailure = "Failure Audit"
+	AuditInfo    = "Information"
+	AuditWarning = "Warning"
+	AuditError   = "Error"
+)
+
+// WinEvent is one Windows event log record, held in a format-neutral shape so
+// the same definition can be emitted as Snare or as eventchannel JSON.
+type WinEvent struct {
+	EventID      string
+	Channel      string // Security, System, Microsoft-Windows-PowerShell/Operational, ...
+	Provider     string
+	ProviderGUID string
+	Task         string // numeric task code
+	TaskName     string // the category string shown in Event Viewer
+	AuditType    string // one of the Audit* constants
+	Keywords     string
+	Computer     string
+	User         string // the account Windows attributes the record to
+	Message      string // the full multi-line description
+	EventData    map[string]string
+	Criticality  int // Snare criticality, 0-4
+	RecordID     int
+	ProcessID    int
+	ThreadID     int
+}
+
 // Payload is what a control produces: a single log record, already rendered,
 // but not yet wrapped in a syslog header.
 type Payload struct {
@@ -257,8 +287,9 @@ type Payload struct {
 	Host     string // syslog hostname
 	Facility int
 	Severity int
-	Message  string // the log line itself
-	Raw      bool   // true to skip the syslog header entirely
+	Message  string    // the log line itself; ignored when Win is set
+	Win      *WinEvent // set for Windows records, which the sender encodes
+	Raw      bool      // true to skip the syslog header entirely
 }
 
 // Definition binds a Control's metadata to the function that renders it.
