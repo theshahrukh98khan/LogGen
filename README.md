@@ -355,18 +355,53 @@ Preview renders the real wire format before you save.
 
 Custom controls persist in `data/profiles.json` and cannot shadow a built-in ID.
 
-## Sending
+## Using it
 
-- **Click a card** — sends one record immediately with generated field values.
-- **Details** — opens a drawer to set specific fields (username, source IP, …)
-  before sending, and to preview the exact wire format without sending.
-- **Burst / Delay** — emit up to 500 records at a set interval. Bursts reuse one
-  connection and regenerate fields per record, so a brute-force run looks like a
-  brute-force run.
+The console has three places: **Send**, **Targets** and **Library**.
 
-Everything sent is recorded in the **Activity** feed with the exact bytes, which
-is the fastest way to establish whether a decoding problem is in the log or in
-the SIEM.
+### The destination bar
+
+Across the top sits the destination and its actual state, because sending to
+nowhere is the first thing that goes wrong:
+
+| State | Meaning |
+|---|---|
+| **Connected** | TCP handshake succeeded; something is listening. |
+| **Ready** | UDP socket opened. **Delivery is not confirmed.** |
+| **Unreachable** | Nothing is listening. Check host, port and firewall. |
+
+The UDP wording is deliberate. A UDP send always looks successful even when the
+collector is down, so the bar says the delivery is unverified rather than
+showing a green light that means nothing. Confirm a record actually arrived at
+the collector.
+
+### Sending
+
+- **Click a card** to send it. **Details** opens a drawer to set specific fields
+  and preview the exact wire format first.
+- **Recently sent** keeps the last few one click away, since the same records
+  get fired repeatedly while a rule is being written.
+- **Repeat** emits up to 500 records at a set interval, reusing one connection
+  and regenerating fields per record, so a brute-force run looks like one.
+
+### Keyboard
+
+| Key | Action |
+|---|---|
+| `/` | Jump to search from anywhere |
+| `Enter` | Send the first match |
+| `↓` | Step from search into the grid |
+| `← → ↑ ↓` | Move between cards |
+| `Enter` / `Space` | Send the focused card |
+| `Esc` | Close the drawer, or clear the search |
+
+### Seeing what went out
+
+The **Last record** panel shows the most recent line byte for byte, with its
+priority decoded — `PRI 132` becomes `local0 · warning`. Below it, **Sent** is a
+compact history; clicking any row puts that record back in the panel. That is
+the fastest way to establish whether a decoding problem is in the log or in the
+SIEM.
 
 ## Windows output formats
 
