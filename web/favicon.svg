@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="LogGen">
+  <!-- The same amber mark the console header carries, so a pinned tab is
+       recognisable at favicon size. Letterforms are drawn rather than set in
+       type, because a browser rendering a favicon has no web font. -->
+  <rect width="64" height="64" rx="14" fill="#FFB020"/>
+  <g fill="#1A1200">
+    <!-- L -->
+    <path d="M13 17h7v22h12v7H13z"/>
+    <!-- G -->
+    <path d="M51 28h-7a5 5 0 0 0-5-4h-2a5 5 0 0 0-5 5v6a5 5 0 0 0 5 5h2a5 5 0 0 0 5-4v-2h-5v-6h12v6a12 12 0 0 1-12 12h-2a12 12 0 0 1-12-12v-6a12 12 0 0 1 12-12h2a12 12 0 0 1 12 12z"/>
+  </g>
+</svg>

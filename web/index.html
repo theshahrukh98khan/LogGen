@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LogGen</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -16,8 +17,7 @@
 
   <nav class="nav" id="mainNav">
     <button class="nav-item active" data-view="send">Send</button>
-    <button class="nav-item" data-view="targets">Targets</button>
-    <button class="nav-item" data-view="library" id="btnAdmin">Library</button>
+    <button class="nav-item" data-view="admin" id="btnAdmin">Administration</button>
   </nav>
 
   <div class="topbar-right">
@@ -67,7 +67,7 @@
 
     <div class="strip-head">
       <h4 class="strip-title" id="controlCount">Controls</h4>
-      <span class="strip-hint">Click a card to send it. Details to set fields first.</span>
+      <span class="strip-hint">Send puts one record on the wire. Details sets fields first.</span>
     </div>
 
     <div id="controlGrid" class="grid"></div>
@@ -97,20 +97,20 @@
 <section id="adminView" class="admin hidden">
   <div class="admin-head">
     <div>
-      <h2 id="adminTitle">Library</h2>
-      <p class="sub" id="adminSub">Your own log sources and records</p>
+      <h2 id="adminTitle">Destinations</h2>
+      <p class="sub" id="adminSub">Where LogGen sends records</p>
     </div>
     <button id="btnCloseAdmin" class="btn primary">Done</button>
   </div>
 
   <div class="admin-tabs">
-    <button class="tab active" data-admin="customs">Log sources &amp; controls</button>
-    <button class="tab" data-admin="profiles">Destinations</button>
+    <button class="tab active" data-admin="profiles">Destinations</button>
+    <button class="tab" data-admin="customs">Log sources &amp; controls</button>
     <button class="tab" data-admin="estate">Simulated estate</button>
   </div>
 
   <!-- ---------- Custom controls ---------- -->
-  <div id="adminCustoms" class="admin-panel">
+  <div id="adminCustoms" class="admin-panel hidden">
     <div class="admin-grid">
 
       <div class="panel pad">
@@ -196,7 +196,7 @@
   </div>
 
   <!-- ---------- Destinations ---------- -->
-  <div id="adminProfiles" class="admin-panel hidden">
+  <div id="adminProfiles" class="admin-panel">
     <div class="admin-grid">
       <div class="panel pad">
         <h3>Destinations</h3>

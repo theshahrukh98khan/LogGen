@@ -48,6 +48,25 @@
 
 * { box-sizing: border-box; }
 
+/* Every scroller in the console looks the same. Firefox takes the two
+   properties; the ::-webkit- rules cover Chrome, Edge and Safari. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border-radius: 6px;
+  /* The border is the track colour, so the thumb reads as a slim pill with
+     room around it rather than filling the gutter. */
+  border: 2px solid var(--ink);
+}
+::-webkit-scrollbar-thumb:hover { background: #3C4757; }
+::-webkit-scrollbar-corner { background: transparent; }
+
 html, body { height: 100%; }
 
 body {
@@ -360,8 +379,6 @@ main {
   overflow-y: auto;
   scrollbar-width: thin;
 }
-.rail::-webkit-scrollbar { width: 8px; }
-.rail::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 4px; }
 
 .rail h4 {
   font-size: 9.5px;
@@ -412,9 +429,7 @@ main {
   display: flex;
   flex-direction: column;
 }
-.controls .grid { flex: 1 1 auto; overflow-y: auto; align-content: start; scrollbar-width: thin; }
-.controls .grid::-webkit-scrollbar { width: 9px; }
-.controls .grid::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 4px; }
+.controls .grid { flex: 1 1 auto; overflow-y: auto; align-content: start; }
 
 .panel-head {
   display: flex;
@@ -509,8 +524,7 @@ main {
   background: var(--raised);
   transform: translateY(-1px);
 }
-.card:hover .card-open { opacity: 1; }
-.card-open:focus-visible { opacity: 1; }
+
 .card:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
 
 .card-id {
@@ -562,27 +576,48 @@ main {
 .card.sev-high    { box-shadow: inset 0 2px 0 -1px var(--sev-high); }
 .card.sev-critical{ box-shadow: inset 0 2px 0 -1px var(--sev-crit); }
 
-.card-open {
+.card-actions {
   position: absolute;
   bottom: 9px; right: 10px;
-  opacity: .55;
-  transition: opacity .12s, color .12s;
+  display: flex;
+  gap: 5px;
+}
+
+.card-open,
+.card-send {
   font-family: var(--mono);
   font-size: 9.5px;
   text-transform: uppercase;
   letter-spacing: .08em;
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+}
+
+.card-open {
   color: var(--faint);
   background: var(--raised-2);
   border: 1px solid var(--line-2);
-  border-radius: 4px;
-  padding: 2px 7px;
-  cursor: pointer;
 }
-.card-open:hover { color: var(--text); }
-.card-open:focus-visible { opacity: 1; outline: 2px solid var(--signal); }
+.card-open:hover { color: var(--text); border-color: #3B4655; }
+
+/* Sending is the committing action, so it is the one that carries the signal
+   colour and is never ambiguous with opening the details. */
+.card-send {
+  color: var(--signal);
+  background: transparent;
+  border: 1px solid var(--signal-deep);
+  font-weight: 600;
+}
+.card-send:hover { background: var(--signal); color: #1A1200; border-color: var(--signal); }
+
+.card-open:focus-visible,
+.card-send:focus-visible { outline: 2px solid var(--signal); outline-offset: 1px; }
 
 /* The Details button sits bottom-right, so the tag row keeps clear of it. */
-.tags { display: flex; flex-wrap: wrap; gap: 4px; padding-right: 64px; min-height: 18px; }
+/* The action buttons sit bottom-right, so the tag row keeps clear of them. */
+.tags { display: flex; flex-wrap: wrap; gap: 4px; padding-right: 118px; min-height: 20px; }
 
 .tag {
   font-size: 9.5px;
@@ -619,10 +654,7 @@ main {
   display: flex;
   flex-direction: column;
   gap: 7px;
-  scrollbar-width: thin;
 }
-.activity-list::-webkit-scrollbar { width: 8px; }
-.activity-list::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 4px; }
 
 /* An empty list should sit in the space rather than cling to the top of it. */
 .activity-list > .hint {
@@ -807,7 +839,6 @@ input:focus, select:focus, textarea:focus {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  scrollbar-width: thin;
 }
 
 .admin-head {

@@ -60,17 +60,35 @@ ck('the grid scrolls inside its column', await page.evaluate(() => {
   const g = document.querySelector('.grid');
   return g.scrollHeight > g.clientHeight;
 }));
+ck('a favicon is declared',
+  await page.evaluate(() => !!document.querySelector('link[rel=icon]')));
+ck('the favicon is served', (await (await page.request.get(BASE + '/favicon.svg')).status()) === 200);
+// Every scroller should look the same, which means none of them falls back to
+// the browser default.
+ck('scrollbars are styled consistently', await page.evaluate(() => {
+  const s = getComputedStyle(document.documentElement);
+  return s.scrollbarWidth === 'thin' || s.scrollbarColor !== 'auto';
+}));
 
 // ---------------------------------------------------------------------------
 section('Navigation');
 
-ck('three sections', (await page.locator('#mainNav .nav-item').count()) === 3);
-await page.click('[data-view=targets]');
+ck('two sections', (await page.locator('#mainNav .nav-item').count()) === 2);
+await page.click('[data-view=admin]');
 await page.waitForTimeout(350);
-ck('Targets opens destinations', await page.locator('#adminProfiles').isVisible());
-await page.click('[data-view=library]');
-await page.waitForTimeout(350);
-ck('Library opens controls', await page.locator('#adminCustoms').isVisible());
+ck('Administration opens on destinations', await page.locator('#adminProfiles').isVisible());
+ck('the heading names the tab',
+  (await page.locator('#adminTitle').textContent()).includes('Destination'),
+  await page.locator('#adminTitle').textContent());
+await page.click('[data-admin=customs]');
+await page.waitForTimeout(300);
+ck('the controls tab opens', await page.locator('#adminCustoms').isVisible());
+ck('the heading follows the tab',
+  (await page.locator('#adminTitle').textContent()).toLowerCase().includes('log source'),
+  await page.locator('#adminTitle').textContent());
+await page.click('[data-admin=estate]');
+await page.waitForTimeout(300);
+ck('the estate tab opens', await page.locator('#adminEstate').isVisible());
 await page.click('[data-view=send]');
 await page.waitForTimeout(350);
 ck('Send returns to the workspace', await page.locator('#simView').isVisible());
@@ -126,7 +144,22 @@ section('Sending');
 
 await page.fill('#search', '4625');
 await page.waitForTimeout(300);
+
+// Clicking the body opens the details; it must not send. This is the guard
+// against a stray click putting a record on a production collector.
+const beforeBodyClick = await page.evaluate(async () =>
+  (await (await fetch('/api/activity')).json()).length);
 await page.locator('.card').first().click();
+await page.waitForTimeout(1200);
+ck('clicking a card does not send it',
+  (await page.evaluate(async () =>
+    (await (await fetch('/api/activity')).json()).length)) === beforeBodyClick);
+ck('clicking a card opens the details', await page.locator('#drawer').isVisible());
+await page.keyboard.press('Escape');
+await page.waitForTimeout(250);
+
+// Sending takes its own button.
+await page.locator('.card').first().locator('.card-send').click();
 await page.waitForTimeout(1300);
 
 ck('the readout shows the record',
@@ -197,9 +230,12 @@ section('Details drawer');
 
 await page.fill('#search', 'kerberoast');
 await page.waitForTimeout(350);
-ck('Details is visible without hovering', await page.evaluate(() => {
-  const b = document.querySelector('.card .card-open');
-  return parseFloat(getComputedStyle(b).opacity) > 0.2;
+ck('both card actions are visible without hovering', await page.evaluate(() => {
+  const open = document.querySelector('.card .card-open');
+  const send = document.querySelector('.card .card-send');
+  const shown = (el) => el && getComputedStyle(el).display !== 'none' &&
+    parseFloat(getComputedStyle(el).opacity) > 0.5;
+  return shown(open) && shown(send);
 }));
 await page.locator('.card').first().locator('.card-open').click();
 await page.waitForTimeout(350);
@@ -218,7 +254,9 @@ await page.waitForTimeout(250);
 // ---------------------------------------------------------------------------
 section('Library: a control on a new source');
 
-await page.click('[data-view=library]');
+await page.click('[data-view=admin]');
+await page.waitForTimeout(300);
+await page.click('[data-admin=customs]');
 await page.waitForTimeout(400);
 
 const stamp = Date.now();
@@ -265,7 +303,9 @@ ck('a blank parameter resolves via its default',
 await page.keyboard.press('Escape');
 
 // Clean up after ourselves.
-await page.click('[data-view=library]');
+await page.click('[data-view=admin]');
+await page.waitForTimeout(300);
+await page.click('[data-admin=customs]');
 await page.waitForTimeout(400);
 page.once('dialog', (d) => d.accept());
 await page.locator('#customList .profile-row', { hasText: `Browser test ${stamp}` })

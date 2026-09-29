@@ -389,7 +389,9 @@ Custom controls persist in `data/profiles.json` and cannot shadow a built-in ID.
 
 ## Using it
 
-The console has three places: **Send**, **Targets** and **Library**.
+The console has two places: **Send**, and **Administration** for everything
+that is configuration rather than simulation — destinations, your own log
+sources, and the simulated estate.
 
 ### The destination bar
 
@@ -409,8 +411,10 @@ the collector.
 
 ### Sending
 
-- **Click a card** to send it. **Details** opens a drawer to set specific fields
-  and preview the exact wire format first.
+- **Send** on a card puts one record on the wire. Clicking the card body opens
+  **Details** instead, where fields can be set and the exact wire format
+  previewed. Sending is never what a stray click does, because the destination
+  may be a production collector.
 - **Recently sent** keeps the last few one click away, since the same records
   get fired repeatedly while a rule is being written.
 - **Repeat** emits up to 500 records at a set interval, reusing one connection
@@ -421,10 +425,10 @@ the collector.
 | Key | Action |
 |---|---|
 | `/` | Jump to search from anywhere |
-| `Enter` | Send the first match |
+| `Enter` | Send the first match, or the focused card |
 | `↓` | Step from search into the grid |
 | `← → ↑ ↓` | Move between cards |
-| `Enter` / `Space` | Send the focused card |
+| `Space` | Open the focused card's details |
 | `Esc` | Close the drawer, or clear the search |
 
 ### Seeing what went out
