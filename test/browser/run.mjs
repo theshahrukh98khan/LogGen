@@ -193,7 +193,7 @@ await page.click('#adminBack');
 await page.waitForTimeout(300);
 ck('a clean form leaves without asking',
   (await page.locator('#adminHub').isVisible()) &&
-  !(await page.locator('#leaveGuard').isVisible()));
+  !(await page.locator('#dialog').isVisible()));
 
 // A touched one does not.
 await page.click('[data-admin=estate]');
@@ -202,22 +202,22 @@ const realDomain = await page.inputValue('#ev_domain');
 await page.fill('#ev_domain', 'unsaved-edit.example');
 await page.click('#brandHome');
 await page.waitForTimeout(300);
-ck('leaving a dirty form asks first', await page.locator('#leaveGuard').isVisible());
+ck('leaving a dirty form asks first', await page.locator('#dialog').isVisible());
 ck('it is still on the form behind the prompt', await page.locator('#adminEstate').isVisible());
 
 // Keep editing stays put and keeps the edit.
-await page.click('#leaveCancel');
+await page.click('#dlg_cancel');
 await page.waitForTimeout(300);
 ck('keep editing stays on the form',
   (await page.locator('#adminEstate').isVisible()) &&
-  !(await page.locator('#leaveGuard').isVisible()));
+  !(await page.locator('#dialog').isVisible()));
 ck('keep editing does not undo the edit',
   (await page.inputValue('#ev_domain')) === 'unsaved-edit.example');
 
 // Discard drops the edit and leaves.
 await page.click('#brandHome');
 await page.waitForTimeout(300);
-await page.click('#leaveDiscard');
+await page.click('#dlg_discard');
 await page.waitForTimeout(400);
 ck('discard leaves the panel', await page.locator('#simView').isVisible());
 await page.click('[data-view=admin]');
@@ -233,11 +233,11 @@ ck('discard did not save the edit',
 await page.fill('#ev_domain', 'guard-test.example');
 await page.click('#adminBack');
 await page.waitForTimeout(300);
-await page.click('#leaveSave');
+await page.click('#dlg_save');
 await page.waitForTimeout(700);
 ck('save leaves the panel once it has written',
   (await page.locator('#adminHub').isVisible()) &&
-  !(await page.locator('#leaveGuard').isVisible()));
+  !(await page.locator('#dialog').isVisible()));
 const saved = await (await fetch(`${BASE}/api/state`)).json();
 ck('save actually persisted the edit', saved.env.domain === 'guard-test.example',
   saved.env.domain);
@@ -479,9 +479,34 @@ await page.click('[data-view=admin]');
 await page.waitForTimeout(300);
 await page.click('[data-admin=customs]');
 await page.waitForTimeout(400);
-page.once('dialog', (d) => d.accept());
+// Deleting asks in the console's own dialog, not the browser's. A native one
+// would never open, so a stray page.on('dialog') here would hide a regression
+// rather than catch it.
+let nativeDialogs = 0;
+page.on('dialog', async (d) => { nativeDialogs++; await d.dismiss(); });
+
 await page.locator('#customList .profile-row', { hasText: `Browser test ${stamp}` })
   .locator('[data-act=delete]').click();
+await page.waitForTimeout(300);
+ck('deleting asks in the console, not the browser',
+  (await page.locator('#dialog').isVisible()) && nativeDialogs === 0);
+ck('the delete dialog names what goes',
+  (await page.locator('#dialogBody').textContent()).includes(`Browser test ${stamp}`));
+ck('cancel is focused, so a stray Enter cannot delete',
+  await page.locator('#dlg_cancel').evaluate((e) => e === document.activeElement));
+
+// Cancel leaves it alone.
+await page.click('#dlg_cancel');
+await page.waitForTimeout(600);
+ck('cancelling keeps the control', await page.evaluate(async (s) => {
+  const list = await (await fetch('/api/customs')).json();
+  return list.some((c) => c.name === `Browser test ${s}`);
+}, stamp));
+
+await page.locator('#customList .profile-row', { hasText: `Browser test ${stamp}` })
+  .locator('[data-act=delete]').click();
+await page.waitForTimeout(300);
+await page.click('#dlg_delete');
 await page.waitForTimeout(900);
 ck('the control can be deleted', await page.evaluate(async (s) => {
   const list = await (await fetch('/api/customs')).json();
