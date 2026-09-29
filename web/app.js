@@ -8,6 +8,9 @@ const state = {
   query: '',
   active: null,   // control currently open in the drawer
   lastSeq: 0,     // newest activity sequence number already rendered
+  customs: [],    // operator-defined controls
+  sources: [],    // every source that has at least one control
+  placeholders: [],
 };
 
 // Matches activityCap in the server; the feed keeps at most this many rows.
@@ -54,6 +57,9 @@ async function boot() {
     state.env = s.env;
     state.profiles = s.profiles;
     state.controls = s.controls;
+    state.customs = s.customs || [];
+    state.sources = s.sources || [];
+    state.placeholders = await api('GET', '/api/placeholders');
   } catch (err) {
     toast(`Could not load state: ${err.message}`, 'bad');
     return;
@@ -61,6 +67,9 @@ async function boot() {
   renderProfileSelect();
   renderTabs();
   renderGrid();
+  buildFacilitySelects();
+  renderPlaceholders();
+  renderSourceOptions();
   refreshActivity();
   setInterval(refreshActivity, 2500);
 }
@@ -157,6 +166,7 @@ function card(c) {
   el.title = 'Click to send · use the Details button to edit fields first';
 
   const tags = [];
+  if (c.custom) tags.push('<span class="tag custom">custom</span>');
   if (c.eventId) tags.push(`<span class="tag evt">EID ${esc(c.eventId)}</span>`);
   if (c.channel) tags.push(`<span class="tag">${esc(c.channel)}</span>`);
   (c.mitre || []).forEach((m) => tags.push(`<span class="tag mitre">${esc(m)}</span>`));
@@ -429,17 +439,8 @@ $('btnTest').onclick = async () => {
   } catch (err) { toast(err.message, 'bad'); }
 };
 
-$('btnProfiles').onclick = () => {
-  renderProfileList();
-  fillProfileForm(currentProfile());
-  $('profilesModal').classList.remove('hidden');
-};
-
-$('btnEnv').onclick = () => { fillEnvForm(); $('envModal').classList.remove('hidden'); };
-
-document.querySelectorAll('[data-close]').forEach((b) => {
-  b.onclick = () => $(b.dataset.close).classList.add('hidden');
-});
+// Profiles and the estate now live in the Administration view; admin.js wires
+// the button that opens it.
 
 $('pf_reset').onclick = () => fillProfileForm(null);
 
@@ -487,7 +488,6 @@ $('btnClearActivity').onclick = () => {
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   $('drawer').classList.add('hidden');
-  document.querySelectorAll('.modal').forEach((m) => m.classList.add('hidden'));
 });
 
 function esc(s) {
@@ -495,4 +495,4 @@ function esc(s) {
     (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 }
 
-boot();
+// boot() is called at the end of admin.js, once every function it needs exists.

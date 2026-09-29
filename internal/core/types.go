@@ -242,6 +242,9 @@ type Param struct {
 	Key         string `json:"key"`
 	Label       string `json:"label"`
 	Placeholder string `json:"placeholder"`
+	// Default is used when the operator leaves the field blank. It may be a
+	// literal, or a token such as {{external_ip}} to have one generated.
+	Default string `json:"default,omitempty"`
 }
 
 // Control is the metadata for one clickable simulation. It is pure data so it
@@ -258,6 +261,8 @@ type Control struct {
 	Mitre    []string `json:"mitre,omitempty"` // ATT&CK technique IDs
 	Wazuh    []string `json:"wazuh,omitempty"` // rule IDs expected to fire
 	Params   []Param  `json:"params,omitempty"`
+	// Custom marks a control defined by the operator rather than compiled in.
+	Custom bool `json:"custom,omitempty"`
 }
 
 // Windows audit outcomes, as they appear in the Snare EventLogType field.
