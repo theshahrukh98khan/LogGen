@@ -23,9 +23,12 @@ curl -s -X POST http://127.0.0.1:8088/api/profiles \
 # then
 cd test/browser
 npm install
-npx playwright install chromium
 npm test
 ```
+
+`npm install` fetches the browser too. If it is ever missing, or Playwright has
+been upgraded since it was fetched, `npx playwright install chromium` gets it
+back.
 
 `BASE` overrides the URL:
 
