@@ -11,33 +11,33 @@
 <header class="topbar">
   <div class="brand">
     <span class="logo">LG</span>
-    <div>
-      <h1>LogGen</h1>
-      <p class="sub">SIEM log-onboarding &amp; detection-testing lab</p>
-    </div>
+    <h1>LogGen</h1>
   </div>
 
-  <div class="target">
-    <label for="profileSelect">Target</label>
-    <select id="profileSelect"></select>
-    <span id="targetAddr" class="addr"></span>
-    <button id="btnTest" class="btn ghost">Test</button>
-    <button id="btnAdmin" class="btn ghost">Administration</button>
+  <nav class="nav" id="mainNav">
+    <button class="nav-item active" data-view="send">Send</button>
+    <button class="nav-item" data-view="targets">Targets</button>
+    <button class="nav-item" data-view="library" id="btnAdmin">Library</button>
+  </nav>
+
+  <div class="topbar-right">
+    <kbd class="kbd-hint" id="kbdHint">/</kbd>
+    <span class="kbd-label">to search</span>
   </div>
 </header>
 
-<!-- The last record on the wire. This is what the whole tool exists to
-     produce, so it sits above everything else. -->
-<section id="readout" class="readout">
-  <div class="readout-head">
-    <span class="eyebrow"><span class="lamp"></span> Last record on the wire</span>
-    <span class="readout-rule"></span>
-  </div>
-  <pre id="readoutWire" class="readout-wire empty">Nothing sent yet. Pick a control below and it appears here, byte for byte.</pre>
-  <div id="readoutMeta" class="readout-meta"></div>
-</section>
+<!-- The destination, always visible, with its real state. Sending to nowhere
+     is the failure people hit first, so it cannot be a detail in a corner. -->
+<div class="targetbar" id="targetBar">
+  <span class="tb-state" id="tbState"><span class="tb-dot"></span><span id="tbStateText">Checking…</span></span>
+  <select id="profileSelect" aria-label="Destination"></select>
+  <span class="addr" id="targetAddr"></span>
+  <button id="btnTest" class="btn small">Test</button>
+  <button id="btnEditTarget" class="btn small">Edit</button>
+  <span class="tb-note" id="tbNote"></span>
+</div>
 
-<!-- ===================== Simulation view ===================== -->
+<!-- ===================== Send ===================== -->
 <main id="simView">
   <nav class="rail">
     <h4>Sources</h4>
@@ -48,47 +48,64 @@
 
   <section class="controls">
     <div class="panel-head">
-      <h2 id="controlCount">Controls</h2>
-      <div class="filters">
-        <input id="search" type="search" placeholder="Search name, event ID, technique…">
-        <label class="burst">
-          Burst
-          <input id="burstCount" type="number" min="1" max="500" value="1">
-        </label>
-        <label class="burst">
-          Delay
-          <input id="burstDelay" type="number" min="0" max="10000" value="200">
-        </label>
+      <div class="search-wrap">
+        <input id="search" type="search" placeholder="Search by name, event ID or technique">
       </div>
+      <label class="repeat">
+        Repeat
+        <input id="burstCount" type="number" min="1" max="500" value="1">
+        <span>×</span>
+        <input id="burstDelay" type="number" min="0" max="10000" value="200">
+        <span>ms apart</span>
+      </label>
     </div>
+
+    <div id="recentWrap" class="recent-wrap hidden">
+      <h4 class="strip-title">Recently sent</h4>
+      <div id="recentRow" class="recent-row"></div>
+    </div>
+
+    <div class="strip-head">
+      <h4 class="strip-title" id="controlCount">Controls</h4>
+      <span class="strip-hint">Click a card to send it. Details to set fields first.</span>
+    </div>
+
     <div id="controlGrid" class="grid"></div>
-    <p id="emptyHint" class="hint hidden"></p>
+    <div id="emptyHint" class="empty hidden"></div>
   </section>
 
   <section class="activity">
     <div class="panel-head">
-      <h2>Transmission log</h2>
+      <h4 class="strip-title">Sent</h4>
       <button id="btnClearActivity" class="btn small">Clear</button>
     </div>
-    <div id="activityList" class="activity-list">
-      <p class="hint">Nothing sent yet.</p>
+
+    <!-- The most recent record, in full. This is what the tool produces. -->
+    <div id="readout" class="readout">
+      <div class="readout-head">
+        <span class="eyebrow"><span class="lamp"></span> Last record</span>
+      </div>
+      <pre id="readoutWire" class="readout-wire empty">Nothing sent yet.</pre>
+      <div id="readoutMeta" class="readout-meta"></div>
     </div>
+
+    <div id="activityList" class="activity-list"></div>
   </section>
 </main>
 
-<!-- ===================== Administration view ===================== -->
+<!-- ===================== Targets / Library ===================== -->
 <section id="adminView" class="admin hidden">
   <div class="admin-head">
     <div>
-      <h2>Administration</h2>
-      <p class="sub">Targets, the simulated estate, and your own log sources</p>
+      <h2 id="adminTitle">Library</h2>
+      <p class="sub" id="adminSub">Your own log sources and records</p>
     </div>
-    <button id="btnCloseAdmin" class="btn primary">Back to controls</button>
+    <button id="btnCloseAdmin" class="btn primary">Done</button>
   </div>
 
   <div class="admin-tabs">
     <button class="tab active" data-admin="customs">Log sources &amp; controls</button>
-    <button class="tab" data-admin="profiles">SIEM profiles</button>
+    <button class="tab" data-admin="profiles">Destinations</button>
     <button class="tab" data-admin="estate">Simulated estate</button>
   </div>
 
@@ -99,9 +116,9 @@
       <div class="panel pad">
         <h3>Your controls</h3>
         <p class="hint">
-          Add a record to a source that already exists, or type a new source name
-          to create one. Custom controls are saved to disk and appear in the
-          simulation view alongside the built-in ones.
+          Add a record to a source that already exists, or type a new source
+          name to create one. These are saved to disk and appear in Send
+          alongside the built-in ones.
         </p>
         <div id="customList" class="profile-list"></div>
       </div>
@@ -152,9 +169,9 @@
             </label>
           </div>
 
-          <h4>Parameters <span class="opt">fields the operator can fill in before sending</span></h4>
+          <h4>Parameters <span class="opt">fields you can fill in before sending</span></h4>
           <div id="cc_params" class="params-editor"></div>
-          <button type="button" id="cc_addParam" class="btn ghost small">Add parameter</button>
+          <button type="button" id="cc_addParam" class="btn small">Add parameter</button>
 
           <h4>Record template</h4>
           <label class="full">
@@ -168,8 +185,8 @@
           </details>
 
           <div class="form-actions">
-            <button type="button" id="cc_reset" class="btn ghost">New</button>
-            <button type="button" id="cc_preview" class="btn ghost">Preview</button>
+            <button type="button" id="cc_reset" class="btn">New</button>
+            <button type="button" id="cc_preview" class="btn">Preview</button>
             <button type="submit" class="btn primary">Save control</button>
           </div>
           <pre id="cc_wire" class="wire hidden"></pre>
@@ -178,22 +195,22 @@
     </div>
   </div>
 
-  <!-- ---------- Profiles ---------- -->
+  <!-- ---------- Destinations ---------- -->
   <div id="adminProfiles" class="admin-panel hidden">
     <div class="admin-grid">
       <div class="panel pad">
-        <h3>Targets</h3>
-        <p class="hint">Where records are sent. Configure several and switch between them from the top bar.</p>
+        <h3>Destinations</h3>
+        <p class="hint">Where records are sent. Switch between them from the bar at the top.</p>
         <div id="profileList" class="profile-list"></div>
       </div>
 
       <div class="panel pad">
-        <h3 id="profileFormTitle">New profile</h3>
+        <h3 id="profileFormTitle">New destination</h3>
         <form id="profileForm" class="form">
           <input type="hidden" id="pf_id">
           <div class="form-grid">
-            <label>Name<input id="pf_name" required placeholder="Wazuh Manager (prod)"></label>
-            <label>Host / IP<input id="pf_host" required placeholder="192.168.18.20"></label>
+            <label>Name<input id="pf_name" required placeholder="Wazuh manager"></label>
+            <label>Host or IP<input id="pf_host" required placeholder="192.168.18.20"></label>
             <label>Port<input id="pf_port" type="number" min="1" max="65535" value="514" required></label>
             <label>Protocol
               <select id="pf_protocol">
@@ -226,12 +243,12 @@
             </label>
             <label class="check">
               <input type="checkbox" id="pf_default">
-              <span>Use as default target</span>
+              <span>Make this the default destination</span>
             </label>
           </div>
           <div class="form-actions">
-            <button type="button" id="pf_reset" class="btn ghost">New</button>
-            <button type="submit" class="btn primary">Save profile</button>
+            <button type="button" id="pf_reset" class="btn">New</button>
+            <button type="submit" class="btn primary">Save destination</button>
           </div>
         </form>
       </div>
@@ -243,10 +260,10 @@
     <div class="panel pad narrow">
       <h3>Simulated estate</h3>
       <p class="hint">
-        These values keep every generated record consistent, so a Windows logon,
-        a sudo call and an Nginx hit look like they came from the same
-        organisation. User and domain SIDs are derived from them, so an account
-        keeps the same SID across restarts.
+        The organisation every generated record refers to. Setting it once is
+        what makes a Windows logon, a sudo call and an Nginx hit look like they
+        came from the same place. User and domain SIDs are derived from these
+        names, so an account keeps its SID across restarts.
       </p>
       <form id="envForm" class="form">
         <div class="form-grid">
@@ -256,7 +273,7 @@
           <label>Linux host<input id="ev_linuxhost" placeholder="ubuntu-app01"></label>
           <label>Web host<input id="ev_webhost" placeholder="web-prod01"></label>
           <label>Database host<input id="ev_dbhost" placeholder="oracle-db01"></label>
-          <label>Oracle SID / service<input id="ev_dbname" placeholder="ORCL"></label>
+          <label>Oracle SID or service<input id="ev_dbname" placeholder="ORCL"></label>
           <label>Subnet prefix<input id="ev_subnet" placeholder="10.20.30"></label>
         </div>
         <div class="form-actions">
@@ -267,19 +284,19 @@
   </div>
 </section>
 
-<!-- Control detail / preview drawer -->
+<!-- Detail drawer -->
 <div id="drawer" class="drawer hidden">
   <div class="drawer-head">
     <div>
       <h3 id="drawerTitle"></h3>
       <p id="drawerDesc" class="sub"></p>
     </div>
-    <button id="drawerClose" class="btn ghost small">Close</button>
+    <button id="drawerClose" class="btn small">Close</button>
   </div>
   <div id="drawerMeta" class="meta-row"></div>
   <div id="drawerParams" class="params"></div>
   <div class="drawer-actions">
-    <button id="drawerPreview" class="btn ghost">Preview</button>
+    <button id="drawerPreview" class="btn">Preview</button>
     <button id="drawerSend" class="btn primary">Send</button>
   </div>
   <pre id="drawerWire" class="wire hidden"></pre>

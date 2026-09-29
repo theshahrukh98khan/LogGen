@@ -9,6 +9,8 @@ const state = {
   query: '',
   active: null,   // control currently open in the drawer
   lastSeq: 0,     // newest activity sequence number already rendered
+  view: 'send',   // send | targets | library
+  recent: [],     // ids of controls sent lately, newest first
   customs: [],    // operator-defined controls
   sources: [],    // every source that has at least one control
   placeholders: [],
@@ -65,9 +67,12 @@ async function boot() {
     toast(`Could not load state: ${err.message}`, 'bad');
     return;
   }
+  loadRecent();
   renderProfileSelect();
   renderTabs();
   renderGrid();
+  renderRecent();
+  checkTarget();
   buildFacilitySelects();
   renderPlaceholders();
   renderSourceOptions();
@@ -103,6 +108,131 @@ function renderProfileSelect() {
 function renderTargetAddr() {
   const p = currentProfile();
   $('targetAddr').textContent = p ? `${p.protocol}://${p.host}:${p.port} · ${p.format}` : '';
+}
+
+// ---------------------------------------------------------------------------
+// Destination status
+// ---------------------------------------------------------------------------
+
+// checkTarget probes the destination and says plainly what is known.
+//
+// UDP is the trap here: the socket always opens, so a send to a host that is
+// not listening looks identical to one that works. The bar says so rather than
+// showing a green light that means nothing.
+async function checkTarget() {
+  const p = currentProfile();
+  const bar = $('targetBar');
+  const text = $('tbStateText');
+  const note = $('tbNote');
+
+  if (!p) {
+    bar.className = 'targetbar warn';
+    text.textContent = 'No destination';
+    note.textContent = 'Add one before sending.';
+    return;
+  }
+
+  bar.className = 'targetbar checking';
+  text.textContent = 'Checking';
+  note.textContent = '';
+
+  let res;
+  try {
+    res = await api('POST', `/api/profiles/${p.id}/test`, {});
+  } catch {
+    bar.className = 'targetbar bad';
+    text.textContent = 'Unreachable';
+    note.textContent = 'Could not probe the destination.';
+    return;
+  }
+
+  if (!res.ok) {
+    bar.className = 'targetbar bad';
+    text.textContent = 'Unreachable';
+    note.textContent = 'Nothing is listening. Check the host, port and firewall.';
+    return;
+  }
+
+  if (p.protocol === 'udp') {
+    bar.className = 'targetbar unverified';
+    text.textContent = 'Ready';
+    note.textContent = 'UDP delivery is not confirmed by sending. Verify a record arrived at the collector.';
+  } else {
+    bar.className = 'targetbar good';
+    text.textContent = 'Connected';
+    note.textContent = '';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Recently sent
+// ---------------------------------------------------------------------------
+
+// The same few records get fired over and over while a rule is being written,
+// so the last handful stay one click away.
+function loadRecent() {
+  try {
+    state.recent = JSON.parse(localStorage.getItem('loggen.recent') || '[]');
+  } catch { state.recent = []; }
+}
+
+function rememberRecent(id) {
+  state.recent = [id, ...state.recent.filter((x) => x !== id)].slice(0, 6);
+  try { localStorage.setItem('loggen.recent', JSON.stringify(state.recent)); } catch {}
+  renderRecent();
+}
+
+function renderRecent() {
+  const wrap = $('recentWrap');
+  const row = $('recentRow');
+  if (!wrap || !row) return;
+
+  const items = state.recent
+    .map((id) => state.controls.find((c) => c.id === id))
+    .filter(Boolean);
+
+  wrap.classList.toggle('hidden', items.length === 0);
+  row.innerHTML = '';
+  items.forEach((c) => {
+    const b = document.createElement('button');
+    b.className = 'chip-btn';
+    b.type = 'button';
+    const a = anchorFor(c);
+    b.innerHTML = '<span class="chip-id">' + esc(a.text) + '</span>' +
+                  '<span class="chip-name">' + esc(c.name) + '</span>';
+    b.onclick = () => send(c, {});
+    row.appendChild(b);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Views
+// ---------------------------------------------------------------------------
+
+const VIEW_COPY = {
+  library: ['Library', 'Your own log sources and records'],
+  targets: ['Destinations', 'Where LogGen sends records'],
+};
+
+function showView(view) {
+  state.view = view;
+  document.querySelectorAll('#mainNav .nav-item').forEach((b) =>
+    b.classList.toggle('active', b.dataset.view === view));
+
+  const admin = view !== 'send';
+  $('adminView').classList.toggle('hidden', !admin);
+  $('simView').classList.toggle('hidden', admin);
+
+  if (!admin) return;
+
+  const copy = VIEW_COPY[view] || VIEW_COPY.library;
+  $('adminTitle').textContent = copy[0];
+  $('adminSub').textContent = copy[1];
+  showAdminTab(view === 'targets' ? 'profiles' : 'customs');
+  renderProfileList();
+  renderCustomList();
+  renderSourceOptions();
+  fillEnvForm();
 }
 
 // ---------------------------------------------------------------------------
@@ -182,7 +312,10 @@ function matches(c) {
   if (state.source !== 'all' && c.source !== state.source) return false;
   if (state.group !== 'all' && c.group !== state.group) return false;
   if (!state.query) return true;
-  const hay = [c.name, c.desc, c.eventId, c.group, c.channel,
+  // The ID and source are searched too, so shorthand people actually type
+  // finds things: "sqli" matches nginx-sqli even though the catalog calls it
+  // "SQL injection attempt".
+  const hay = [c.name, c.desc, c.eventId, c.group, c.channel, c.id, c.source,
     ...(c.mitre || []), ...(c.wazuh || [])].join(' ').toLowerCase();
   return hay.includes(state.query);
 }
@@ -197,10 +330,16 @@ function renderGrid() {
 
   const hint = $('emptyHint');
   if (!list.length) {
-    hint.textContent = state.controls.length
-      ? 'No controls match this filter.'
-      : 'No controls registered yet.';
+    hint.innerHTML = '<p>Nothing matches that.</p>' +
+      '<p class="muted">Try a different search, or clear the filters.</p>' +
+      '<button class="btn" id="clearFilters">Clear filters</button>';
     hint.classList.remove('hidden');
+    const btn = document.getElementById('clearFilters');
+    if (btn) btn.onclick = () => {
+      state.source = 'all'; state.group = 'all'; state.query = '';
+      $('search').value = '';
+      renderAll();
+    };
     return;
   }
   hint.classList.add('hidden');
@@ -265,6 +404,7 @@ async function send(control, params) {
     const res = await api('POST', '/api/send', {
       controlId: control.id, profileId: p.id, params, count, delayMs,
     });
+    rememberRecent(control.id);
     if (res.queued) {
       toast(`Queued ${res.queued} × ${control.name} → ${res.target}`, 'ok');
     } else {
@@ -352,7 +492,7 @@ function decodePri(wire) {
 }
 
 // showOnWire updates the readout and flashes the lamp for one send.
-function showOnWire(act) {
+function showOnWire(act, isNew = true) {
   if (!act || !act.wire) return;
   const box = $('readout');
   const pre = $('readoutWire');
@@ -371,6 +511,7 @@ function showOnWire(act) {
   if (act.control) bits.push('<span class="name">' + esc(act.control) + '</span>');
   $('readoutMeta').innerHTML = bits.join('');
 
+  if (!isNew) return;
   box.classList.remove('live');
   void box.offsetWidth;           // restart the pulse
   box.classList.add('live');
@@ -383,18 +524,26 @@ function showOnWire(act) {
 
 // activityEntry builds one row of the feed.
 function activityEntry(a) {
-  const el = document.createElement('div');
+  const el = document.createElement('button');
+  el.type = 'button';
   el.className = 'act' + (a.ok ? '' : ' fail');
   el.dataset.seq = a.seq;
+  el.title = 'Show this record above';
+
   const t = new Date(a.time).toLocaleTimeString();
-  el.innerHTML = `
-    <div class="act-head">
-      <span class="act-name">${esc(a.control)}</span>
-      <span class="act-time">${esc(t)}</span>
-    </div>
-    <div class="act-meta">${esc(a.target)} · ${a.ok ? `${a.bytes} bytes` : 'FAILED'}</div>
-    ${a.error ? `<div class="act-err">${esc(a.error)}</div>` : ''}
-    ${a.wire ? `<pre class="act-wire">${esc(a.wire)}</pre>` : ''}`;
+  el.innerHTML =
+    '<div class="act-head">' +
+      '<span class="act-name">' + esc(a.control) + '</span>' +
+      '<span class="act-time">' + esc(t) + '</span>' +
+    '</div>' +
+    '<div class="act-meta">' +
+      (a.ok ? a.bytes + ' bytes' : 'failed') + ' · ' + esc(a.target) +
+    '</div>' +
+    (a.error ? '<div class="act-err">' + esc(a.error) + '</div>' : '');
+
+  // The full bytes live in the readout, so a row is a way back to one rather
+  // than a second copy of it.
+  el.onclick = () => showOnWire(a, false);
   return el;
 }
 
@@ -409,7 +558,7 @@ function renderActivity(list) {
 
   if (!list || !list.length) {
     if (state.lastSeq !== 0 || !box.querySelector('.hint')) {
-      box.innerHTML = '<p class="hint">Nothing sent yet. Click a control to emit a record.</p>';
+      box.innerHTML = '<p class="hint">Records you send appear here.</p>';
       state.lastSeq = 0;
     }
     return;
@@ -536,16 +685,18 @@ function fillEnvForm() {
 // Wiring
 // ---------------------------------------------------------------------------
 
-$('profileSelect').onchange = renderTargetAddr;
+$('profileSelect').onchange = () => { renderTargetAddr(); checkTarget(); };
 
 $('search').oninput = (e) => { state.query = e.target.value.trim().toLowerCase(); renderGrid(); };
 
 $('btnTest').onclick = async () => {
   const p = currentProfile();
   if (!p) return;
+  await checkTarget();
   try {
     const res = await api('POST', `/api/profiles/${p.id}/test`, {});
-    toast(res.ok ? `${res.target} — ${res.note}` : `${res.target} — ${res.error}`, res.ok ? 'ok' : 'bad');
+    toast(res.ok ? `${res.target} — ${res.note}` : `${res.target} — ${res.error}`,
+      res.ok ? 'ok' : 'bad');
   } catch (err) { toast(err.message, 'bad'); }
 };
 
@@ -594,11 +745,6 @@ $('btnClearActivity').onclick = () => {
   // Forget what was rendered so the next poll repopulates from scratch.
   state.lastSeq = 0;
 };
-
-document.addEventListener('keydown', (e) => {
-  if (e.key !== 'Escape') return;
-  $('drawer').classList.add('hidden');
-});
 
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g,

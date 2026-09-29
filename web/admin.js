@@ -10,17 +10,6 @@
 // View switching
 // ---------------------------------------------------------------------------
 
-function showAdmin(show) {
-  $('adminView').classList.toggle('hidden', !show);
-  $('simView').classList.toggle('hidden', show);
-  if (show) {
-    renderProfileList();
-    renderCustomList();
-    renderSourceOptions();
-    fillEnvForm();
-  }
-}
-
 function showAdminTab(name) {
   document.querySelectorAll('.admin-tabs .tab').forEach((b) =>
     b.classList.toggle('active', b.dataset.admin === name));
@@ -239,11 +228,69 @@ async function reloadCatalog() {
 // Wiring
 // ---------------------------------------------------------------------------
 
-$('btnAdmin').onclick = () => showAdmin(true);
-$('btnCloseAdmin').onclick = () => showAdmin(false);
+document.querySelectorAll('#mainNav .nav-item').forEach((b) => {
+  b.onclick = () => showView(b.dataset.view);
+});
+
+$('btnCloseAdmin').onclick = () => showView('send');
+$('btnEditTarget').onclick = () => showView('targets');
 
 document.querySelectorAll('.admin-tabs .tab').forEach((b) => {
   b.onclick = () => showAdminTab(b.dataset.admin);
+});
+
+// ---------------------------------------------------------------------------
+// Keyboard
+//
+// This tool gets driven repeatedly while a rule is being written on another
+// screen, so the common path stays on the keyboard.
+// ---------------------------------------------------------------------------
+
+document.addEventListener('keydown', (e) => {
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+
+  // "/" jumps to search from anywhere.
+  if (e.key === '/' && !typing) {
+    e.preventDefault();
+    showView('send');
+    $('search').focus();
+    $('search').select();
+    return;
+  }
+
+  if (e.key === 'Escape') {
+    if (!$('drawer').classList.contains('hidden')) {
+      $('drawer').classList.add('hidden');
+      return;
+    }
+    if (document.activeElement === $('search')) {
+      $('search').value = '';
+      state.query = '';
+      renderGrid();
+      $('search').blur();
+    }
+    return;
+  }
+
+  // From the search box, Enter sends the first match and Down steps into the
+  // grid, so a search can be completed without reaching for the mouse.
+  if (document.activeElement === $('search')) {
+    const first = document.querySelector('#controlGrid .card');
+    if (e.key === 'Enter' && first) { e.preventDefault(); first.click(); }
+    if (e.key === 'ArrowDown' && first) { e.preventDefault(); first.focus(); }
+    return;
+  }
+
+  // Arrow keys move between cards once one has focus.
+  if (document.activeElement.classList.contains('card')) {
+    const cards = [...document.querySelectorAll('#controlGrid .card')];
+    const i = cards.indexOf(document.activeElement);
+    const cols = Math.max(1, Math.round(
+      document.getElementById('controlGrid').clientWidth /
+      (document.activeElement.offsetWidth + 9)));
+    const next = { ArrowRight: i + 1, ArrowLeft: i - 1, ArrowDown: i + cols, ArrowUp: i - cols }[e.key];
+    if (next !== undefined && cards[next]) { e.preventDefault(); cards[next].focus(); }
+  }
 });
 
 $('cc_addParam').onclick = () => $('cc_params').appendChild(paramRow());
