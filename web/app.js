@@ -5,6 +5,7 @@ const state = {
   profiles: [],
   controls: [],
   source: 'all',
+  group: 'all',
   query: '',
   active: null,   // control currently open in the drawer
   lastSeq: 0,     // newest activity sequence number already rendered
@@ -109,7 +110,7 @@ function renderTargetAddr() {
 // ---------------------------------------------------------------------------
 
 const SOURCE_LABELS = {
-  all: 'All',
+  all: 'All sources',
   windows: 'Windows',
   linux: 'Linux',
   nginx: 'Nginx',
@@ -118,24 +119,68 @@ const SOURCE_LABELS = {
   diagnostics: 'Diagnostics',
 };
 
+function sourceLabel(src) {
+  return SOURCE_LABELS[src] || src.charAt(0).toUpperCase() + src.slice(1);
+}
+
+// railRow builds one filter row: a name on the left, a count on the right.
+function railRow(label, count, active, onClick) {
+  const b = document.createElement('button');
+  b.className = 'tab' + (active ? ' active' : '');
+  b.type = 'button';
+  b.innerHTML = '<span>' + esc(label) + '</span><span class="n">' + count + '</span>';
+  b.onclick = onClick;
+  return b;
+}
+
+// renderTabs fills the source rail. Groups are scoped to the chosen source,
+// because "Authentication" means something different under Windows than it
+// does under Oracle.
 function renderTabs() {
-  const sources = ['all', ...new Set(state.controls.map((c) => c.source))];
-  const tabs = $('sourceTabs');
-  tabs.innerHTML = '';
+  const rail = $('sourceTabs');
+  rail.innerHTML = '';
+
+  const sources = [...new Set(state.controls.map((c) => c.source))].sort();
+  rail.appendChild(railRow('All sources', state.controls.length,
+    state.source === 'all', () => { state.source = 'all'; state.group = 'all'; renderAll(); }));
+
   sources.forEach((src) => {
-    const count = src === 'all'
-      ? state.controls.length
-      : state.controls.filter((c) => c.source === src).length;
-    const b = document.createElement('button');
-    b.className = 'tab' + (state.source === src ? ' active' : '');
-    b.textContent = `${SOURCE_LABELS[src] || src} (${count})`;
-    b.onclick = () => { state.source = src; renderTabs(); renderGrid(); };
-    tabs.appendChild(b);
+    const n = state.controls.filter((c) => c.source === src).length;
+    rail.appendChild(railRow(sourceLabel(src), n, state.source === src,
+      () => { state.source = src; state.group = 'all'; renderAll(); }));
   });
+
+  renderGroupRail();
+}
+
+function renderGroupRail() {
+  const rail = $('groupTabs');
+  if (!rail) return;
+  rail.innerHTML = '';
+
+  const inSource = state.controls.filter(
+    (c) => state.source === 'all' || c.source === state.source);
+  const groups = [...new Set(inSource.map((c) => c.group))].sort();
+
+  rail.appendChild(railRow('All groups', inSource.length,
+    state.group === 'all', () => { state.group = 'all'; renderAll(); }));
+
+  groups.forEach((g) => {
+    const n = inSource.filter((c) => c.group === g).length;
+    rail.appendChild(railRow(g, n, state.group === g,
+      () => { state.group = g; renderAll(); }));
+  });
+}
+
+// renderAll repaints both rails and the grid after a filter change.
+function renderAll() {
+  renderTabs();
+  renderGrid();
 }
 
 function matches(c) {
   if (state.source !== 'all' && c.source !== state.source) return false;
+  if (state.group !== 'all' && c.group !== state.group) return false;
   if (!state.query) return true;
   const hay = [c.name, c.desc, c.eventId, c.group, c.channel,
     ...(c.mitre || []), ...(c.wazuh || [])].join(' ').toLowerCase();
@@ -146,6 +191,9 @@ function renderGrid() {
   const grid = $('controlGrid');
   const list = state.controls.filter(matches);
   grid.innerHTML = '';
+
+  const count = $('controlCount');
+  if (count) count.textContent = list.length + ' control' + (list.length === 1 ? '' : 's');
 
   const hint = $('emptyHint');
   if (!list.length) {
@@ -160,26 +208,40 @@ function renderGrid() {
   list.forEach((c) => grid.appendChild(card(c)));
 }
 
+// anchorFor picks what a card leads with. Analysts recognise these records by
+// their identifier, so that is the headline: an event ID where one exists, the
+// channel where it does not, and the source as a last resort.
+function anchorFor(c) {
+  if (c.eventId) return { text: c.eventId, numeric: /^[0-9]/.test(c.eventId) };
+  if (c.channel) return { text: c.channel, numeric: false };
+  return { text: c.source, numeric: false };
+}
+
 function card(c) {
   const el = document.createElement('div');
-  el.className = `card sev-${c.severity}`;
-  el.title = 'Click to send · use the Details button to edit fields first';
+  el.className = 'card sev-' + c.severity;
+  el.tabIndex = 0;
+  el.title = 'Click to send. Use Details to set fields first.';
 
+  const anchor = anchorFor(c);
   const tags = [];
   if (c.custom) tags.push('<span class="tag custom">custom</span>');
-  if (c.eventId) tags.push(`<span class="tag evt">EID ${esc(c.eventId)}</span>`);
-  if (c.channel) tags.push(`<span class="tag">${esc(c.channel)}</span>`);
-  (c.mitre || []).forEach((m) => tags.push(`<span class="tag mitre">${esc(m)}</span>`));
-  (c.wazuh || []).forEach((w) => tags.push(`<span class="tag wazuh">${esc(w)}</span>`));
+  (c.mitre || []).forEach((m) => tags.push('<span class="tag mitre">' + esc(m) + '</span>'));
+  (c.wazuh || []).forEach((w) => tags.push('<span class="tag wazuh">' + esc(w) + '</span>'));
 
-  el.innerHTML = `
-    <button class="card-open" type="button">Details</button>
-    <div class="card-title">${esc(c.name)}</div>
-    <div class="card-desc">${esc(c.desc || '')}</div>
-    <div class="tags">${tags.join('')}</div>`;
+  el.innerHTML =
+    '<span class="sev-chip sev-' + esc(c.severity) + '">' + esc(c.severity) + '</span>' +
+    '<div class="card-id' + (anchor.numeric ? '' : ' text') + '">' + esc(anchor.text) + '</div>' +
+    '<div class="card-title">' + esc(c.name) + '</div>' +
+    '<div class="card-desc">' + esc(c.desc || '') + '</div>' +
+    '<div class="tags">' + tags.join('') + '</div>' +
+    '<button class="card-open" type="button">Details</button>';
 
   el.querySelector('.card-open').onclick = (e) => { e.stopPropagation(); openDrawer(c); };
   el.onclick = () => send(c, {});
+  el.onkeydown = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); send(c, {}); }
+  };
   return el;
 }
 
@@ -241,6 +303,7 @@ function openDrawer(c) {
   if (c.eventId) meta.push(`<span class="tag evt">EID ${esc(c.eventId)}</span>`);
   if (c.channel) meta.push(`<span class="tag">${esc(c.channel)}</span>`);
   meta.push(`<span class="tag">${esc(c.group)}</span>`);
+  if (c.custom) meta.push('<span class="tag custom">custom</span>');
   (c.mitre || []).forEach((m) => meta.push(`<span class="tag mitre">${esc(m)}</span>`));
   (c.wazuh || []).forEach((w) => meta.push(`<span class="tag wazuh">rule ${esc(w)}</span>`));
   $('drawerMeta').innerHTML = meta.join('');
@@ -266,6 +329,52 @@ function drawerParams() {
     if (i.value.trim()) out[i.dataset.param] = i.value.trim();
   });
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Wire readout
+// ---------------------------------------------------------------------------
+
+const FACILITY_NAMES = ['kern','user','mail','daemon','auth','syslog','lpr','news',
+  'uucp','cron','authpriv','ftp','ntp','audit','alert','clock',
+  'local0','local1','local2','local3','local4','local5','local6','local7'];
+const SEVERITY_NAMES = ['emerg','alert','crit','err','warning','notice','info','debug'];
+
+// decodePri turns the leading <134> into "local0 . info", which is the one
+// piece of a syslog line people routinely have to work out by hand.
+function decodePri(wire) {
+  const m = /^<(\d{1,3})>/.exec(wire || '');
+  if (!m) return null;
+  const pri = parseInt(m[1], 10);
+  const f = pri >> 3, s = pri & 7;
+  if (f > 23 || s > 7) return null;
+  return { pri, facility: FACILITY_NAMES[f] || ('facility' + f), severity: SEVERITY_NAMES[s] };
+}
+
+// showOnWire updates the readout and flashes the lamp for one send.
+function showOnWire(act) {
+  if (!act || !act.wire) return;
+  const box = $('readout');
+  const pre = $('readoutWire');
+  pre.textContent = act.wire;
+  pre.classList.remove('empty');
+
+  // Each fact is its own element so the row's flex gap separates them.
+  const bits = [];
+  const d = decodePri(act.wire);
+  if (d) {
+    bits.push('<span><b>PRI ' + d.pri + '</b> ' + esc(d.facility) +
+      ' \u00b7 ' + esc(d.severity) + '</span>');
+  }
+  if (act.target) bits.push('<span>' + esc(act.target) + '</span>');
+  if (act.bytes) bits.push('<span><b>' + act.bytes + '</b> bytes</span>');
+  if (act.control) bits.push('<span class="name">' + esc(act.control) + '</span>');
+  $('readoutMeta').innerHTML = bits.join('');
+
+  box.classList.remove('live');
+  void box.offsetWidth;           // restart the pulse
+  box.classList.add('live');
+  setTimeout(() => box.classList.remove('live'), 700);
 }
 
 // ---------------------------------------------------------------------------
@@ -325,6 +434,7 @@ function renderActivity(list) {
     }
   }
 
+  showOnWire(list[0]);
   state.lastSeq = list[0].seq;
 }
 

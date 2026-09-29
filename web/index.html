@@ -26,35 +26,52 @@
   </div>
 </header>
 
+<!-- The last record on the wire. This is what the whole tool exists to
+     produce, so it sits above everything else. -->
+<section id="readout" class="readout">
+  <div class="readout-head">
+    <span class="eyebrow"><span class="lamp"></span> Last record on the wire</span>
+    <span class="readout-rule"></span>
+  </div>
+  <pre id="readoutWire" class="readout-wire empty">Nothing sent yet. Pick a control below and it appears here, byte for byte.</pre>
+  <div id="readoutMeta" class="readout-meta"></div>
+</section>
+
 <!-- ===================== Simulation view ===================== -->
 <main id="simView">
-  <section class="panel controls">
+  <nav class="rail">
+    <h4>Sources</h4>
+    <div id="sourceTabs" class="rail-group"></div>
+    <h4>Groups</h4>
+    <div id="groupTabs" class="rail-group"></div>
+  </nav>
+
+  <section class="controls">
     <div class="panel-head">
-      <h2>Controls</h2>
+      <h2 id="controlCount">Controls</h2>
       <div class="filters">
-        <input id="search" type="search" placeholder="Search controls, event IDs, techniques…">
+        <input id="search" type="search" placeholder="Search name, event ID, technique…">
         <label class="burst">
           Burst
           <input id="burstCount" type="number" min="1" max="500" value="1">
         </label>
         <label class="burst">
-          Delay ms
+          Delay
           <input id="burstDelay" type="number" min="0" max="10000" value="200">
         </label>
       </div>
     </div>
-    <div id="sourceTabs" class="tabs"></div>
     <div id="controlGrid" class="grid"></div>
     <p id="emptyHint" class="hint hidden"></p>
   </section>
 
-  <section class="panel activity">
+  <section class="activity">
     <div class="panel-head">
-      <h2>Activity</h2>
-      <button id="btnClearActivity" class="btn ghost small">Clear view</button>
+      <h2>Transmission log</h2>
+      <button id="btnClearActivity" class="btn small">Clear</button>
     </div>
     <div id="activityList" class="activity-list">
-      <p class="hint">Nothing sent yet. Click a control to emit a record.</p>
+      <p class="hint">Nothing sent yet.</p>
     </div>
   </section>
 </main>

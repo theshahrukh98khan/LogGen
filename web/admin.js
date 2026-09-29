@@ -230,8 +230,7 @@ async function reloadCatalog() {
   state.controls = s.controls;
   state.customs = s.customs || [];
   state.sources = s.sources || [];
-  renderTabs();
-  renderGrid();
+  renderAll();
   renderCustomList();
   renderSourceOptions();
 }
