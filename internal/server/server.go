@@ -69,9 +69,23 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/preview", s.handlePreview)
 	mux.HandleFunc("POST /api/send", s.handleSend)
 
-	mux.Handle("/", http.FileServer(http.FS(s.web)))
+	mux.Handle("/", noStore(http.FileServer(http.FS(s.web))))
 
 	return logRequests(mux)
+}
+
+// noStore stops browsers caching the console.
+//
+// Embedded files carry a zero modification time, so the usual validators are
+// useless: after upgrading LogGen a browser will happily keep serving the
+// previous build's CSS and JavaScript against the new binary. The console is
+// served from localhost and weighs a few kilobytes, so revalidating every time
+// costs nothing and removes a confusing class of stale-asset bug.
+func noStore(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store, must-revalidate")
+		next.ServeHTTP(w, r)
+	})
 }
 
 // ---------------------------------------------------------------------------
