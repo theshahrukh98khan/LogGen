@@ -11,7 +11,7 @@ Built and tested against [Wazuh](https://wazuh.com), but it speaks plain syslog,
 so it works with any collector that does.
 
 - Single binary, no runtime dependencies, no build step for the UI
-- 128 controls across Windows, Linux, Nginx and Apache
+- 163 controls across Windows, Linux, Nginx, Apache and Oracle Database
 - Multiple SIEM target profiles: host, port, TCP/UDP, syslog format
 - Every record shows you the exact bytes that went on the wire
 - A built-in syslog receiver, so you can verify the pipeline before pointing it
@@ -28,6 +28,7 @@ a decoder that works here works on a live host.
 | **Linux** | 25 | SSH, PAM, sudo and su, account management, cron and crontab, systemd units, auditd execve and SUID creation, firewall drops, history tampering |
 | **Nginx** | 20 | 16 access-log cases, 4 error-log cases |
 | **Apache** | 20 | the same 16 cases plus 4 error cases, in Apache's formats |
+| **Oracle** | 35 | Standard and unified audit trails, listener log, alert log |
 
 Web cases cover normal traffic, 401/403/404/500, SQL injection, XSS, path
 traversal, command injection, Log4Shell, web shells, scanner user agents,
@@ -50,6 +51,41 @@ production.
 Field structures follow the
 [Ultimate Windows Security encyclopedia](https://www.ultimatewindowssecurity.com/securitylog/encyclopedia/default.aspx).
 </details>
+
+### Oracle Database
+
+Oracle reaches a SIEM by three different paths, and they produce three unrelated
+record shapes. All are provided:
+
+| Path | Enabled by | Record |
+|---|---|---|
+| Standard audit trail | `AUDIT_SYSLOG_LEVEL` | `Oracle Audit[pid]: LENGTH: "414" SESSIONID:[7] "…"` — fields carry an explicit value length |
+| Unified audit trail (12c+) | `UNIFIED_AUDIT_SYSTEMLOG` | `Oracle Unified Audit[pid]: LENGTH: '209' TYPE:"4" DBID:"…"` — different field names, no length markers, single-quoted `LENGTH` |
+| Listener and alert logs | shipping the files | `*`-delimited TNS records, and ISO-8601 alert records |
+
+Which audit path applies depends on the database's version and migration state.
+`AUDIT_SYSLOG_LEVEL` has **no effect** once a database has been migrated to
+unified auditing, so a decoder written for one will not read the other.
+
+Coverage: logon success and failure (return codes 1017, 28000, 28001), logoff,
+SELECT on audited tables, `BY SESSION` summaries with `SES$ACTIONS`, denied
+access (942, 1031), user create/drop/alter, system privilege and role grants,
+database links, DROP and TRUNCATE, `NOAUDIT` and `ALTER SYSTEM`, listener
+connections and TNS errors (12514, 12502, 12525, 01189), service registration
+and death, instance startup and shutdown, ORA-00600, ORA-01555, and fatal NI
+connect errors.
+
+> **Wazuh ships no Oracle decoders.** Unlike the other four sources, these
+> records will not decode out of the box — the upstream ruleset has decoders for
+> MySQL, PostgreSQL, MariaDB, MongoDB and SQL Server, but none for Oracle, and
+> there is no reserved rule-ID range for it. Write custom decoders and rules in
+> the user range (100000+). That is precisely what these controls are for.
+
+A few details could not be confirmed against a captured record and are marked in
+the source: what `LENGTH` counts, which Oracle release introduced the
+`NAME:[len]` form, and the exact syslog spelling of `SQLTEXT` and `SES$TID`.
+Check against one real record from your own instance before relying on those
+fields.
 
 ## Install
 
@@ -209,6 +245,7 @@ internal/catalog/        control registry
   windows_extended.go    delegation, discovery, directory and audit-integrity events
   linux.go               Linux syslog controls
   web.go                 Nginx + Apache, generated from one shared case table
+  oracle.go              Oracle standard/unified audit, listener and alert logs
 internal/sink/           local syslog receiver for testing
 internal/server/         HTTP API and console
 web/                     operator console (no build step, no framework)

@@ -23,6 +23,8 @@ type Env struct {
 	WinHost   string `json:"winHost"`   // WIN-DC01
 	LinuxHost string `json:"linuxHost"` // ubuntu-app01
 	WebHost   string `json:"webHost"`   // web-prod01
+	DBHost    string `json:"dbHost"`    // oracle-db01
+	DBName    string `json:"dbName"`    // ORCL  (Oracle SID / service name)
 	Subnet    string `json:"subnet"`    // 10.20.30  (first three octets)
 }
 
@@ -34,6 +36,8 @@ func DefaultEnv() Env {
 		WinHost:   "WIN-DC01",
 		LinuxHost: "ubuntu-app01",
 		WebHost:   "web-prod01",
+		DBHost:    "oracle-db01",
+		DBName:    "ORCL",
 		Subnet:    "10.20.30",
 	}
 }
@@ -56,10 +60,17 @@ func (e Env) Normalize() Env {
 	if strings.TrimSpace(e.WebHost) == "" {
 		e.WebHost = d.WebHost
 	}
+	if strings.TrimSpace(e.DBHost) == "" {
+		e.DBHost = d.DBHost
+	}
+	if strings.TrimSpace(e.DBName) == "" {
+		e.DBName = d.DBName
+	}
 	if strings.TrimSpace(e.Subnet) == "" {
 		e.Subnet = d.Subnet
 	}
 	e.NetBIOS = strings.ToUpper(e.NetBIOS)
+	e.DBName = strings.ToUpper(strings.TrimSpace(e.DBName))
 	e.Subnet = strings.TrimSuffix(strings.TrimSpace(e.Subnet), ".")
 	return e
 }
@@ -213,6 +224,7 @@ const (
 	SourceLinux   = "linux"
 	SourceNginx   = "nginx"
 	SourceApache  = "apache"
+	SourceOracle  = "oracle"
 )
 
 // Severity labels used for colour coding in the UI.

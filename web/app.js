@@ -101,6 +101,7 @@ const SOURCE_LABELS = {
   linux: 'Linux',
   nginx: 'Nginx',
   apache: 'Apache',
+  oracle: 'Oracle',
   diagnostics: 'Diagnostics',
 };
 
@@ -365,6 +366,8 @@ function fillEnvForm() {
   $('ev_winhost').value = state.env.winHost || '';
   $('ev_linuxhost').value = state.env.linuxHost || '';
   $('ev_webhost').value = state.env.webHost || '';
+  $('ev_dbhost').value = state.env.dbHost || '';
+  $('ev_dbname').value = state.env.dbName || '';
   $('ev_subnet').value = state.env.subnet || '';
 }
 
@@ -421,6 +424,8 @@ $('envForm').onsubmit = async (e) => {
       winHost: $('ev_winhost').value,
       linuxHost: $('ev_linuxhost').value,
       webHost: $('ev_webhost').value,
+      dbHost: $('ev_dbhost').value,
+      dbName: $('ev_dbname').value,
       subnet: $('ev_subnet').value,
     });
     fillEnvForm();

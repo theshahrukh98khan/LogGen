@@ -69,6 +69,8 @@ func sourceRank(s string) int {
 		return 3
 	case core.SourceApache:
 		return 4
+	case core.SourceOracle:
+		return 5
 	default:
 		return 9
 	}
