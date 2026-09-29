@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,6 +33,11 @@ type Store struct {
 }
 
 // Open loads the store from path, creating it with sane defaults if missing.
+//
+// A file that will not parse is moved aside rather than treated as fatal. The
+// alternative is a tool that refuses to start and leaves the operator to find
+// and delete the file themselves, which is a poor trade for a lab tool whose
+// configuration is a handful of destinations.
 func Open(path string) (*Store, error) {
 	s := &Store{path: path}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -41,17 +47,21 @@ func Open(path string) (*Store, error) {
 	b, err := os.ReadFile(path)
 	switch {
 	case errors.Is(err, os.ErrNotExist):
-		s.st = state{Env: core.DefaultEnv(), Profiles: []core.Profile{core.DefaultProfile()}}
-		if err := s.save(); err != nil {
-			return nil, err
-		}
-		return s, nil
+		return s, s.reset()
 	case err != nil:
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
 
 	if err := json.Unmarshal(b, &s.st); err != nil {
-		return nil, fmt.Errorf("parse %s: %w", path, err)
+		kept, moveErr := s.quarantine()
+		if moveErr != nil {
+			return nil, fmt.Errorf("parse %s: %w (and it could not be moved aside: %v)",
+				path, err, moveErr)
+		}
+		log.Printf("%s could not be read (%v); it has been kept as %s and a fresh one started",
+			path, err, filepath.Base(kept))
+		s.st = state{}
+		return s, s.reset()
 	}
 	s.st.Env = s.st.Env.Normalize()
 	for i := range s.st.Profiles {
@@ -65,6 +75,22 @@ func Open(path string) (*Store, error) {
 	}
 	s.ensureDefault()
 	return s, nil
+}
+
+// reset installs the default configuration and writes it.
+func (s *Store) reset() error {
+	s.st = state{Env: core.DefaultEnv(), Profiles: []core.Profile{core.DefaultProfile()}}
+	return s.save()
+}
+
+// quarantine renames an unreadable config out of the way and returns where it
+// went, so nothing the operator wrote is ever silently destroyed.
+func (s *Store) quarantine() (string, error) {
+	kept := fmt.Sprintf("%s.unreadable-%s", s.path, time.Now().Format("20060102-150405"))
+	if err := os.Rename(s.path, kept); err != nil {
+		return "", err
+	}
+	return kept, nil
 }
 
 // save writes the state atomically. Callers must hold the write lock.
@@ -225,10 +251,16 @@ func (s *Store) Update(id string, p core.Profile) (core.Profile, error) {
 }
 
 // Delete removes a target. The last remaining profile cannot be deleted.
+//
+// Existence is checked before the last-profile guard, so deleting an ID that
+// does not exist reports that, rather than blaming the profile count.
 func (s *Store) Delete(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if !s.hasProfile(id) {
+		return ErrNotFound
+	}
 	if len(s.st.Profiles) <= 1 {
 		return errors.New("cannot delete the only profile")
 	}
@@ -252,18 +284,21 @@ func (s *Store) SetDefault(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	found := false
-	for i := range s.st.Profiles {
-		if s.st.Profiles[i].ID == id {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !s.hasProfile(id) {
 		return ErrNotFound
 	}
 	s.clearDefaultsExcept(id)
 	return s.save()
+}
+
+// hasProfile reports whether id exists. Callers must hold the lock.
+func (s *Store) hasProfile(id string) bool {
+	for i := range s.st.Profiles {
+		if s.st.Profiles[i].ID == id {
+			return true
+		}
+	}
+	return false
 }
 
 // clearDefaultsExcept marks only id as default. Callers must hold the lock.

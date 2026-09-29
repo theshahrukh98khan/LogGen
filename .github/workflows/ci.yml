@@ -68,6 +68,47 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: go build -ldflags "-s -w" -o /tmp/loggen .
 
+  browser:
+    name: Browser tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build
+        run: go build -o loggen .
+
+      - name: Start a sink and the console
+        run: |
+          ./loggen -sink :5514 > sink.log 2>&1 &
+          ./loggen -addr 127.0.0.1:8088 -open=false -data "$(mktemp -d)" > server.log 2>&1 &
+          for i in $(seq 1 30); do
+            sleep 1
+            if curl -sf http://127.0.0.1:8088/api/controls -o /dev/null; then break; fi
+          done
+          curl -sf -X POST http://127.0.0.1:8088/api/profiles             -H 'Content-Type: application/json'             -d '{"name":"CI sink","host":"127.0.0.1","port":5514,"protocol":"udp","isDefault":true}'
+
+      - name: Install Playwright
+        working-directory: test/browser
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Run the browser suite
+        working-directory: test/browser
+        run: node run.mjs
+
+      - name: Server log on failure
+        if: failure()
+        run: tail -50 server.log sink.log
+
   catalog:
     name: Catalog integrity
     runs-on: ubuntu-latest

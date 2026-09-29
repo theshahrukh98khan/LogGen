@@ -4,15 +4,21 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"flag"
+	"fmt"
 	"io/fs"
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
+	"syscall"
 	"time"
 
 	"github.com/theshahrukh98khan/LogGen/internal/catalog"
@@ -24,12 +30,41 @@ import (
 //go:embed all:web
 var embeddedWeb embed.FS
 
+// version is stamped at build time with -ldflags "-X main.version=v1.2.3".
+// Left unset, it is read back from the build info, so a `go install` still
+// reports something useful.
+var version = ""
+
+func buildVersion() string {
+	if version != "" {
+		return version
+	}
+	if info, ok := debug.ReadBuildInfo(); ok {
+		if info.Main.Version != "" && info.Main.Version != "(devel)" {
+			return info.Main.Version
+		}
+		for _, s := range info.Settings {
+			if s.Key == "vcs.revision" && len(s.Value) >= 7 {
+				return s.Value[:7]
+			}
+		}
+	}
+	return "dev"
+}
+
 func main() {
 	addr := flag.String("addr", "0.0.0.0:8088", "address for the operator console")
 	data := flag.String("data", "data", "directory holding profiles.json")
 	open := flag.Bool("open", true, "open the console in a browser on start")
 	sinkAddr := flag.String("sink", "", "run a syslog receiver on this address instead of the console, e.g. :5514")
+	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("loggen %s  %s/%s  %s\n",
+			buildVersion(), runtime.GOOS, runtime.GOARCH, runtime.Version())
+		return
+	}
 
 	log.SetFlags(log.Ltime)
 
@@ -59,6 +94,7 @@ func main() {
 	}
 
 	local, urls := consoleURLs(*addr)
+	log.Printf("LogGen %s", buildVersion())
 	log.Printf("%d control(s) registered", catalog.Count())
 	if def, err := st.Default(); err == nil {
 		log.Printf("default target: %s://%s (%s)", def.Protocol, def.Addr(), def.Name)
@@ -75,8 +111,30 @@ func main() {
 		go launchBrowser(local)
 	}
 
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	// Serve until interrupted, then let in-flight requests finish. Without this
+	// a Ctrl+C during a burst kills the process mid-write, and the operator is
+	// left wondering whether the last records went out.
+	serveErr := make(chan error, 1)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			serveErr <- err
+		}
+	}()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	select {
+	case err := <-serveErr:
 		log.Fatalf("serve: %v", err)
+	case <-stop:
+		log.Print("shutting down")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Printf("some requests were still running at shutdown: %v", err)
 	}
 }
 

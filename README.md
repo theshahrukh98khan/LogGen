@@ -245,6 +245,11 @@ Public and you accept that. Check with `Get-NetConnectionProfile`.
 | `-data` | `data` | Directory holding `profiles.json` |
 | `-open` | `true` | Open a browser on start |
 | `-sink` | *(off)* | Run as a syslog receiver instead, e.g. `-sink :5514` |
+| `-version` | | Print the version and exit |
+
+LogGen shuts down cleanly on Ctrl+C or `SIGTERM`, letting in-flight requests
+finish, so a burst that is interrupted does not leave you wondering whether the
+last records went out.
 
 ## Trying it without a SIEM
 
@@ -558,14 +563,25 @@ go test ./...        # or: make test
 go test ./... -race  # needs a C toolchain
 ```
 
-CI runs all of those on every push, cross-compiles for four platforms, and
-starts the binary to confirm the catalog still registers cleanly.
+CI runs all of those on every push, cross-compiles for four platforms, runs the
+browser suite, and starts the binary to confirm the catalogue still registers
+cleanly.
 
-The test suite renders every control and checks that none produces an empty
-record or an unresolved format verb, that Snare records keep their fifteen
-fields, that the Windows JSON envelope parses, and that a value appearing in a
-Windows record's description also appears in its structured fields — a
-generator called twice would silently break any rule correlating the two.
+### What the tests cover
+
+**Go tests** render every control and check that none produces an empty record
+or an unresolved format verb, that Snare records keep their fifteen fields, that
+the Windows JSON envelope parses, and that a value appearing in a Windows
+record's description also appears in its structured fields — a generator called
+twice would silently break any rule correlating the two. The store is covered
+for atomic writes, concurrent access, and recovery from a config that will not
+parse.
+
+**Browser tests** live in [`test/browser`](test/browser) and drive a real
+browser against a running server: rendering, filtering, search, destination
+state, sending, the keyboard path, creating and deleting a custom control,
+accessibility and responsive layout. See that directory's README for how to run
+them locally.
 
 ## Author
 
