@@ -28,9 +28,7 @@ const ADMIN_PANELS = {
 };
 
 // showAdminTab drives both levels of the administration view: "hub" shows the
-// landing grid, any other name opens that one panel with a way back. Naming a
-// panel directly still works, so a deep link such as the Edit button on the
-// destination bar lands where it always did.
+// landing grid, any other name opens that one panel with a way back.
 function showAdminTab(name) {
   if (!ADMIN_PANELS[name]) name = 'hub';
   state.adminTab = name;
@@ -286,8 +284,6 @@ document.querySelectorAll('#mainNav .nav-item').forEach((b) => {
 });
 
 $('btnCloseAdmin').onclick = () => showView('send');
-// Edit on the destination bar goes straight to the destinations tab.
-$('btnEditTarget').onclick = () => showView('admin', 'profiles');
 
 document.querySelectorAll('#adminHub .tile').forEach((b) => {
   b.onclick = () => showAdminTab(b.dataset.admin);

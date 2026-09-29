@@ -140,14 +140,12 @@ ck('the placeholder reference is populated', refTokens > 10, `${refTokens} token
 await page.click('#adminBack');
 await page.waitForTimeout(250);
 
-// Deep links still land on a panel directly, which the destination bar relies on.
+// The destination bar switches and tests a destination; editing one is a job
+// for Administration, so the bar must not offer a second way in.
 await page.click('[data-view=send]');
 await page.waitForTimeout(300);
-await page.click('#btnEditTarget');
-await page.waitForTimeout(350);
-ck('Edit target deep-links past the hub',
-  (await page.locator('#adminProfiles').isVisible()) &&
-  !(await page.locator('#adminHub').isVisible()));
+ck('the destination bar has no edit button',
+  (await page.locator('#btnEditTarget').count()) === 0);
 
 await page.click('[data-view=send]');
 await page.waitForTimeout(350);
