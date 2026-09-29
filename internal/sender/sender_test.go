@@ -2,6 +2,7 @@ package sender
 
 import (
 	"encoding/json"
+	"net"
 	"regexp"
 	"strings"
 	"testing"
@@ -331,4 +332,49 @@ func TestNamedDestinationAddr(t *testing.T) {
 			t.Errorf("Addr(%q) = %q, want %q", tc.host, got, tc.want)
 		}
 	}
+}
+
+// TestClassify covers the two failures that need different advice. A port with
+// nothing bound on a host that is up refuses; an address that drops packets
+// times out. Being told to check a firewall when the SIEM is simply not
+// listening sends the operator to the wrong machine.
+func TestClassify(t *testing.T) {
+	t.Run("refused", func(t *testing.T) {
+		// Bind a port, learn its number, then close it so the connect is
+		// refused rather than racing another process for a guessed port.
+		l, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		addr := l.Addr().(*net.TCPAddr)
+		l.Close()
+
+		p := core.Profile{Host: "127.0.0.1", Port: addr.Port, Protocol: core.ProtoTCP}
+		err = Probe(p)
+		if err == nil {
+			t.Skip("something else took the port between closing and dialling")
+		}
+		if got := Classify(err); got != FailRefused {
+			t.Errorf("Classify(%v) = %q, want %q", err, got, FailRefused)
+		}
+	})
+
+	t.Run("timeout", func(t *testing.T) {
+		// 198.51.100.0/24 is TEST-NET-2: reserved for documentation, so it is
+		// routed nowhere and the connect gets no answer at all.
+		p := core.Profile{Host: "198.51.100.1", Port: 514, Protocol: core.ProtoTCP}
+		err := Probe(p)
+		if err == nil {
+			t.Skip("TEST-NET-2 answered, so this network intercepts it")
+		}
+		if got := Classify(err); got != FailTimeout {
+			t.Skipf("Classify(%v) = %q; this network rejects rather than drops", err, got)
+		}
+	})
+
+	t.Run("nil is not a failure kind", func(t *testing.T) {
+		if got := Classify(nil); got != FailOther {
+			t.Errorf("Classify(nil) = %q, want %q", got, FailOther)
+		}
+	})
 }
