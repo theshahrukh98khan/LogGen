@@ -26,6 +26,13 @@ type Env struct {
 	DBHost    string `json:"dbHost"`    // oracle-db01
 	DBName    string `json:"dbName"`    // ORCL  (Oracle SID / service name)
 	Subnet    string `json:"subnet"`    // 10.20.30  (first three octets)
+
+	// Network appliances. Several vendors put a serial or device id in every
+	// record, and firewall rules are written between named interfaces.
+	FWHost   string `json:"fwHost"`   // fw-edge01
+	FWSerial string `json:"fwSerial"` // 0123A45678901234
+	IntIface string `json:"intIface"` // inside
+	ExtIface string `json:"extIface"` // outside
 }
 
 // DefaultEnv is the estate a fresh install starts with.
@@ -39,6 +46,10 @@ func DefaultEnv() Env {
 		DBHost:    "oracle-db01",
 		DBName:    "ORCL",
 		Subnet:    "10.20.30",
+		FWHost:    "fw-edge01",
+		FWSerial:  "0123A45678901234",
+		IntIface:  "inside",
+		ExtIface:  "outside",
 	}
 }
 
@@ -68,6 +79,18 @@ func (e Env) Normalize() Env {
 	}
 	if strings.TrimSpace(e.Subnet) == "" {
 		e.Subnet = d.Subnet
+	}
+	if strings.TrimSpace(e.FWHost) == "" {
+		e.FWHost = d.FWHost
+	}
+	if strings.TrimSpace(e.FWSerial) == "" {
+		e.FWSerial = d.FWSerial
+	}
+	if strings.TrimSpace(e.IntIface) == "" {
+		e.IntIface = d.IntIface
+	}
+	if strings.TrimSpace(e.ExtIface) == "" {
+		e.ExtIface = d.ExtIface
 	}
 	e.NetBIOS = strings.ToUpper(e.NetBIOS)
 	e.DBName = strings.ToUpper(strings.TrimSpace(e.DBName))
@@ -225,6 +248,14 @@ const (
 	SourceNginx   = "nginx"
 	SourceApache  = "apache"
 	SourceOracle  = "oracle"
+
+	// Network security appliances and XDR.
+	SourcePaloAlto    = "paloalto"
+	SourceFortiGate   = "fortigate"
+	SourceSophos      = "sophos"
+	SourceCiscoASA    = "cisco-asa"
+	SourceCiscoFTD    = "cisco-ftd"
+	SourceTrendVision = "trendmicro"
 )
 
 // Severity labels used for colour coding in the UI.

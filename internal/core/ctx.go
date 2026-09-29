@@ -229,6 +229,20 @@ func (c *Ctx) MAC() string {
 	return strings.Join(parts, ":")
 }
 
+// SessionID returns a firewall session or connection identifier.
+func (c *Ctx) SessionID() string { return strconv.Itoa(c.Int(100000, 99999999)) }
+
+// Bytes returns a plausible transfer size for a session.
+func (c *Ctx) Bytes() int { return c.Int(64, 4_000_000) }
+
+// Packets returns a packet count consistent with a short session.
+func (c *Ctx) Packets() int { return c.Int(1, 4000) }
+
+// WellKnownPort returns a destination port a firewall rule would name.
+func (c *Ctx) WellKnownPort() int {
+	return c.Pick1(22, 23, 25, 53, 80, 110, 143, 389, 443, 445, 1433, 3306, 3389, 5432, 8080, 8443)
+}
+
 // UPN builds user@domain.
 func (c *Ctx) UPN(user string) string {
 	return user + "@" + strings.ToLower(c.Env.Domain)
