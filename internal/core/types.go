@@ -182,22 +182,22 @@ func DefaultProfile() Profile {
 // ---------------------------------------------------------------------------
 
 const (
-	FacKern   = 0
-	FacUser   = 1
-	FacMail   = 2
-	FacDaemon = 3
-	FacAuth   = 4
-	FacSyslog = 5
-	FacCron   = 9
+	FacKern     = 0
+	FacUser     = 1
+	FacMail     = 2
+	FacDaemon   = 3
+	FacAuth     = 4
+	FacSyslog   = 5
+	FacCron     = 9
 	FacAuthPriv = 10
-	FacLocal0 = 16
-	FacLocal1 = 17
-	FacLocal2 = 18
-	FacLocal3 = 19
-	FacLocal4 = 20
-	FacLocal5 = 21
-	FacLocal6 = 22
-	FacLocal7 = 23
+	FacLocal0   = 16
+	FacLocal1   = 17
+	FacLocal2   = 18
+	FacLocal3   = 19
+	FacLocal4   = 20
+	FacLocal5   = 21
+	FacLocal6   = 22
+	FacLocal7   = 23
 )
 
 const (

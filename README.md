@@ -10,7 +10,8 @@ one record goes out.
 Built and tested against [Wazuh](https://wazuh.com), but it speaks plain syslog,
 so it works with any collector that does.
 
-- Single binary, no runtime dependencies, no build step for the UI
+- Single static binary — runs on Linux, Windows and macOS, x86-64 and ARM64
+- No runtime dependencies, no third-party Go modules, no build step for the UI
 - 163 controls across Windows, Linux, Nginx, Apache and Oracle Database
 - Multiple SIEM target profiles: host, port, TCP/UDP, syslog format
 - Every record shows you the exact bytes that went on the wire
@@ -89,7 +90,11 @@ fields.
 
 ## Install
 
-Requires Go 1.24 or newer. There are no third-party dependencies.
+LogGen is a single static binary with no runtime dependencies. It runs on
+**Linux, Windows and macOS**, on both x86-64 and ARM64. Building needs Go 1.24
+or newer; running needs nothing at all.
+
+### Ubuntu / Linux
 
 ```sh
 git clone https://github.com/theshahrukh98khan/LogGen
@@ -98,9 +103,71 @@ go build -o loggen .
 ./loggen
 ```
 
-This repository is private, so cloning needs credentials — a personal access
-token over HTTPS, or an SSH key with
-`git@github.com:theshahrukh98khan/LogGen.git`.
+If Go is not installed:
+
+```sh
+sudo apt update && sudo apt install -y golang-go git
+```
+
+Ubuntu's packaged Go can lag behind. If `go version` reports older than 1.24,
+install a current toolchain from [go.dev/dl](https://go.dev/dl/) instead.
+
+### Windows
+
+```powershell
+git clone https://github.com/theshahrukh98khan/LogGen
+cd LogGen
+go build -o loggen.exe .
+.\loggen.exe
+```
+
+Install Go with `winget install GoLang.Go` or from
+[go.dev/dl](https://go.dev/dl/). On first run Windows Defender Firewall will ask
+whether to allow the console to accept connections — allow it on **private
+networks only**, or decline and reach it at `http://127.0.0.1:8088`.
+
+### Cross-compiling
+
+The build is pure Go, so one machine can produce binaries for every platform:
+
+```sh
+make release          # all platforms into dist/
+
+# or individually
+CGO_ENABLED=0 GOOS=linux   GOARCH=amd64 go build -ldflags "-s -w" -o loggen .
+CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o loggen.exe .
+```
+
+`make` targets: `build`, `run`, `vet`, `fmt`, `release`, `clean`. Windows
+without `make` can run the underlying `go` commands directly.
+
+### Running as a service on Ubuntu
+
+A hardened systemd unit is in [`packaging/loggen.service`](packaging/loggen.service):
+
+```sh
+sudo useradd --system --home /var/lib/loggen --shell /usr/sbin/nologin loggen
+sudo mkdir -p /opt/loggen /var/lib/loggen
+sudo install -m 0755 loggen /opt/loggen/loggen
+sudo chown loggen:loggen /var/lib/loggen
+sudo cp packaging/loggen.service /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now loggen
+```
+
+The unit binds the console to localhost, since it is unauthenticated. To reach
+it from your workstation, tunnel over SSH rather than exposing it:
+
+```sh
+ssh -L 8088:127.0.0.1:8088 user@the-host
+```
+
+### Notes for either platform
+
+Sending to a SIEM on port 514 needs no special privileges — LogGen only connects
+outbound. Running the **sink** on a port below 1024 does need privileges on
+Linux (`sudo ./loggen -sink :514`); use a high port like `:5514` to avoid that.
+
+### Running it
 
 The console binds to all interfaces on port 8088 and prints every URL it is
 reachable on:
@@ -236,6 +303,9 @@ way.
 
 ```
 main.go                  entry point, flags, embedded web assets
+Makefile                 build, cross-compile and release targets
+packaging/               systemd unit for running as a service on Linux
+.github/workflows/       CI (vet, cross-compile, catalog check) and release builds
 internal/core/           shared types: Env, Profile, Control, Payload, Ctx + generators
 internal/store/          JSON persistence for profiles and estate
 internal/sender/         syslog encoding (3164/5424/raw), Snare and eventchannel JSON,
@@ -325,14 +395,29 @@ LogGen writes synthetic log records to a SIEM you control, for validating parser
 and detection logic in a lab you own. It is not an attack tool and performs no
 real activity on any host.
 
-## Adding to it
+## Contributing
 
-New controls are the most useful thing to add — a source that is missing, or an
-event ID that matters for a detection you are writing. Keep the message structure
-faithful to what the real source emits; a control that is nearly right is worse
-than none, because it teaches a rule to match something that will never occur.
+New controls are the most useful contribution — a log source that is missing, or
+an event ID that matters for a detection you are writing.
+
+The one rule that matters: **keep the record faithful to what the real source
+emits.** A control that is nearly right is worse than none, because it teaches a
+rule to match something that will never occur in production. Where a format
+cannot be confirmed against a real captured record or vendor documentation, say
+so in a comment rather than guessing — there are several such notes already in
+`oracle.go`.
+
+Before opening a pull request:
+
+```sh
+gofmt -l .      # must print nothing
+go vet ./...
+go build ./...
+```
+
+CI runs those on every push, cross-compiles for four platforms, and starts the
+binary to confirm the catalog still registers cleanly.
 
 ## License
 
-[MIT](LICENSE). The repository is private, so nothing is distributed yet; the
-licence applies if and when it is shared.
+[MIT](LICENSE)
