@@ -22,6 +22,7 @@ type Env struct {
 	NetBIOS   string `json:"netbios"`   // CORP
 	WinHost   string `json:"winHost"`   // WIN-DC01
 	LinuxHost string `json:"linuxHost"` // ubuntu-app01
+	MacHost   string `json:"macHost"`   // MACBOOK-JDOE
 	WebHost   string `json:"webHost"`   // web-prod01
 	DBHost    string `json:"dbHost"`    // oracle-db01
 	DBName    string `json:"dbName"`    // ORCL  (Oracle SID / service name)
@@ -42,6 +43,7 @@ func DefaultEnv() Env {
 		NetBIOS:   "CORP",
 		WinHost:   "WIN-DC01",
 		LinuxHost: "ubuntu-app01",
+		MacHost:   "macbook-jdoe",
 		WebHost:   "web-prod01",
 		DBHost:    "oracle-db01",
 		DBName:    "ORCL",
@@ -67,6 +69,9 @@ func (e Env) Normalize() Env {
 	}
 	if strings.TrimSpace(e.LinuxHost) == "" {
 		e.LinuxHost = d.LinuxHost
+	}
+	if strings.TrimSpace(e.MacHost) == "" {
+		e.MacHost = d.MacHost
 	}
 	if strings.TrimSpace(e.WebHost) == "" {
 		e.WebHost = d.WebHost
@@ -245,6 +250,7 @@ func Priority(facility, severity int) int { return facility*8 + severity }
 const (
 	SourceWindows = "windows"
 	SourceLinux   = "linux"
+	SourceMacOS   = "macos"
 	SourceNginx   = "nginx"
 	SourceApache  = "apache"
 	SourceOracle  = "oracle"

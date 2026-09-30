@@ -256,6 +256,7 @@ const SOURCE_LABELS = {
   all: 'All sources',
   windows: 'Windows',
   linux: 'Linux',
+  macos: 'macOS',
   nginx: 'Nginx',
   apache: 'Apache',
   oracle: 'Oracle',
@@ -718,6 +719,7 @@ function fillEnvForm() {
   $('ev_netbios').value = state.env.netbios || '';
   $('ev_winhost').value = state.env.winHost || '';
   $('ev_linuxhost').value = state.env.linuxHost || '';
+  $('ev_machost').value = state.env.macHost || '';
   $('ev_webhost').value = state.env.webHost || '';
   $('ev_dbhost').value = state.env.dbHost || '';
   $('ev_dbname').value = state.env.dbName || '';
@@ -943,6 +945,7 @@ $('envForm').onsubmit = async (e) => {
       netbios: $('ev_netbios').value,
       winHost: $('ev_winhost').value,
       linuxHost: $('ev_linuxhost').value,
+      macHost: $('ev_machost').value,
       webHost: $('ev_webhost').value,
       dbHost: $('ev_dbhost').value,
       dbName: $('ev_dbname').value,
