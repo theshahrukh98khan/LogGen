@@ -85,6 +85,12 @@ func sourceRank(s string) int {
 		return 11
 	case core.SourceTrendVision:
 		return 12
+	case core.SourceCrowdStrike:
+		return 13
+	case core.SourceSentinelOne:
+		return 14
+	case core.SourceAWSCloudTrail:
+		return 15
 	default:
 		return 21
 	}
