@@ -262,6 +262,11 @@ const (
 	SourceCiscoASA    = "cisco-asa"
 	SourceCiscoFTD    = "cisco-ftd"
 	SourceTrendVision = "trendmicro"
+	SourceCrowdStrike = "crowdstrike"
+	SourceSentinelOne = "sentinelone"
+
+	// Cloud platforms.
+	SourceAWSCloudTrail = "aws-cloudtrail"
 )
 
 // Severity labels used for colour coding in the UI.

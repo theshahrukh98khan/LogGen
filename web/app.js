@@ -266,6 +266,9 @@ const SOURCE_LABELS = {
   'cisco-asa': 'Cisco ASA',
   'cisco-ftd': 'Cisco FTD',
   trendmicro: 'Trend Micro',
+  crowdstrike: 'CrowdStrike Falcon',
+  sentinelone: 'SentinelOne',
+  'aws-cloudtrail': 'AWS CloudTrail',
   diagnostics: 'Diagnostics',
 };
 
