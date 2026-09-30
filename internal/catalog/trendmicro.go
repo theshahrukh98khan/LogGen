@@ -21,6 +21,32 @@ import (
 //
 // These are Vision One records specifically, not Deep Security or Apex One,
 // which are separate products with their own formats.
+//
+// Source: Trend Vision One event logging and Syslog Content Mapping - CEF.
+//
+//	https://docs.trendmicro.com/en-us/documentation/article/trend-vision-one-event-logging
+//	https://docs.trendmicro.com/en-us/documentation/article/trend-vision-one-syslog-mapping-cef
+//
+// What the published documentation confirms, and what these records follow:
+//
+//   - The Syslog Connector forwards Workbench alerts, Observed Attack
+//     Techniques, and account and system audit logs. Those are the categories
+//     modelled here.
+//   - src, spt, dst and dpt carry straight through with their CEF meanings.
+//   - The CEF mapping is applied globally across endpoint events, so a given
+//     event will not populate every field. Events originating from products
+//     that do not report network data, Apex One among them, arrive with src,
+//     spt, dst and dpt empty. oatNoNetwork below reproduces that rather than
+//     always filling them in, because a rule written against a field that is
+//     usually absent will not fire.
+//   - One OAT event carrying several filter objects is split into one syslog
+//     entry per object. Each entry repeats the parent id and carries its own
+//     unique_id, which is how a SIEM is meant to regroup them.
+//
+// What is NOT confirmed: the exact custom-string slot assignments. The vendor
+// pages that hold the cs1Label through cs6Label table do not render, so those
+// below are inferred from the field names Vision One exposes and should be
+// checked against a real forwarder before a decoder is written against them.
 
 const (
 	cefVersion    = "CEF:0"
@@ -148,12 +174,18 @@ func registerTrendVisionOne() {
 				o.id = t
 			}
 
+			// A parent id shared across the entries an event splits into, and
+			// a unique_id per entry. A SIEM regroups on the first.
+			parentID := strings.Trim(c.GUID(), "{}")
+
 			ext := []string{
 				cefKV("rt", cefTime(c)),
 				cefKV("dvchost", host),
 				cefKV("suser", c.Env.NetBIOS+`\`+user),
 				cefKV("src", c.InternalIP()),
-				cefKV("externalId", strings.Trim(c.GUID(), "{}")),
+				cefKV("externalId", parentID),
+				cefKV("cs6Label", "uniqueId"),
+				cefKV("cs6", strings.Trim(c.GUID(), "{}")),
 				cefKV("cat", "ObservedAttackTechniques"),
 				cefKV("act", "detected"),
 				cefKV("cs1Label", "filterName"),
