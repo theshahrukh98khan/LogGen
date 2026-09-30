@@ -232,12 +232,12 @@ func consoleURLs(addr string) (local string, all []string) {
 func launchBrowser(url string) {
 	time.Sleep(300 * time.Millisecond)
 
+	// Windows and Linux are the supported platforms. Anything else falls
+	// through to xdg-open, which will not work, and the URL is logged instead.
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "windows":
 		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
-	case "darwin":
-		cmd = exec.Command("open", url)
 	default:
 		cmd = exec.Command("xdg-open", url)
 	}

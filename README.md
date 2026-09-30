@@ -15,7 +15,7 @@ one record goes out.
 Built and tested against [Wazuh](https://wazuh.com), but it speaks plain syslog,
 so it works with any collector that does.
 
-- Single static binary — runs on Linux, Windows and macOS, x86-64 and ARM64
+- Single static binary — runs on Windows and Linux, x86-64 and ARM64
 - No runtime dependencies, no third-party Go modules, no build step for the UI
 - 206 controls across Windows, Linux, web servers, Oracle, and five network security platforms
 - Multiple SIEM target profiles: host, port, TCP/UDP, syslog format
@@ -153,9 +153,12 @@ and pass `-Addr 127.0.0.1:8088` to keep the console off the network.
 
 ## Install
 
-LogGen is a single static binary with no runtime dependencies. It runs on
-**Linux, Windows and macOS**, on both x86-64 and ARM64. Building needs Go 1.24
-or newer; running needs nothing at all.
+LogGen is a single static binary with no runtime dependencies. The supported
+platforms are **Windows** and **Linux (Ubuntu)**, on both x86-64 and ARM64.
+Building needs Go 1.24 or newer; running needs nothing at all.
+
+It generates macOS records without running on a Mac, which is the point: you do
+not need the platform to test detections for it.
 
 ### Ubuntu / Linux
 
