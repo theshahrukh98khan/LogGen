@@ -17,7 +17,7 @@ so it works with any collector that does.
 
 - Single static binary — runs on Windows and Linux, x86-64 and ARM64
 - No runtime dependencies, no third-party Go modules, no build step for the UI
-- 206 controls across Windows, Linux, web servers, Oracle, and five network security platforms
+- 608 controls across Windows, Linux, macOS, web servers, databases, network and security appliances, endpoint platforms, virtualisation, email security and SAP
 - Multiple SIEM target profiles: host, port, TCP/UDP, syslog format
 - An Administration view for adding your own log sources and records
 - Every record shows you the exact bytes that went on the wire
@@ -42,6 +42,17 @@ a decoder that works here works on a live host.
 | **Cisco ASA** | 10 | Connections, access lists, VPN, threat detection, administration |
 | **Cisco FTD** | 4 | Connection, intrusion and file events (430000 range) |
 | **Trend Micro** | 6 | Vision One Workbench alerts, OAT, detections, audit, response |
+| **CrowdStrike Falcon** | 36 | Detections, incidents, identity protection, host management, in the SIEM Connector's CEF output |
+| **SentinelOne** | 35 | Threats, mitigation, tamper, policy and agent events, in the appliance's own pipe-delimited key/value form |
+| **AWS CloudTrail** | 35 | IAM, S3, EC2, KMS, CloudTrail and GuardDuty API activity |
+| **macOS** | 36 | Unified log auth, TCC, Gatekeeper and XProtect, launchd persistence, keychain |
+| **pfSense** | 42 | pf filter log, OpenVPN and IPsec, web UI auth, DHCP, pfBlockerNG |
+| **H3C Comware** | 35 | Device access, configuration, firewall sessions and policy, port security, routing, attack defence |
+| **Huawei VRP** | 35 | Device access, account management, configuration, firewall policy, threat defence, availability |
+| **VMware vCenter** | 35 | SSO and vCenter auth, permissions and roles, VM lifecycle, snapshots, datastore, ESXi shell and lockdown |
+| **Barracuda WAF** | 41 | Web Firewall attacks and rate control, access log, audit, system, network firewall |
+| **Barracuda Email Security** | 36 | Inbound threats, phishing and impersonation, quarantine, outbound mail, encryption, administration |
+| **SAP** | 36 | Security Audit Log: logon, authorisations, debug and replace, transaction start, RFC, data download, audit configuration |
 
 Web cases cover normal traffic, 401/403/404/500, SQL injection, XSS, path
 traversal, command injection, Log4Shell, web shells, scanner user agents,

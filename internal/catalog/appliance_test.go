@@ -274,3 +274,135 @@ func TestApplianceRecordsAreSingleLine(t *testing.T) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// SAP Security Audit Log
+// ---------------------------------------------------------------------------
+
+// A SAL record is fixed width: every field is read by offset, so a value one
+// character too long shifts everything after it and the record silently decodes
+// as something else. The offsets are the ones documented in sap.go.
+func TestSAPSALRecordLayout(t *testing.T) {
+	ids := []string{}
+	for _, c := range Controls() {
+		if c.Source == core.SourceSAP {
+			ids = append(ids, c.ID)
+		}
+	}
+	if len(ids) == 0 {
+		t.Fatal("no SAP controls are registered")
+	}
+
+	msgID := regexp.MustCompile(`^[A-Z][A-Z0-9]{2}$`)
+	digits := regexp.MustCompile(`^\d+$`)
+
+	for _, id := range ids {
+		body := bodyOf(t, id)
+		if len(body) != 200 {
+			t.Errorf("%s produced a %d character record, want 200", id, len(body))
+			continue
+		}
+		if body[0:1] != "3" {
+			t.Errorf("%s: version character is %q, want \"3\"", id, body[0:1])
+		}
+		if got := body[1:4]; !msgID.MatchString(got) {
+			t.Errorf("%s: message id %q is not three upper-case characters", id, got)
+		}
+		if got := body[4:12]; !digits.MatchString(got) {
+			t.Errorf("%s: date field %q is not eight digits", id, got)
+		}
+		if got := body[12:18]; !digits.MatchString(got) {
+			t.Errorf("%s: time field %q is not six digits", id, got)
+		}
+		if got := body[20:25]; !digits.MatchString(got) {
+			t.Errorf("%s: OS pid field %q is not five digits", id, got)
+		}
+		if got := body[27:30]; !digits.MatchString(got) {
+			t.Errorf("%s: work process number %q is not three digits", id, got)
+		}
+		if got := body[30:32]; got != salDialog && got != salBackground {
+			t.Errorf("%s: work process and task type %q is neither %q nor %q",
+				id, got, salDialog, salBackground)
+		}
+		if got := body[112:115]; !digits.MatchString(got) {
+			t.Errorf("%s: client %q is not three digits", id, got)
+		}
+		// Fields are left justified and blank padded, never shifted right.
+		for _, f := range []struct {
+			name       string
+			start, end int
+		}{
+			{"user", 40, 52},
+			{"transaction", 52, 72},
+			{"program", 72, 112},
+			{"variables", 116, 180},
+			{"terminal", 180, 200},
+		} {
+			v := body[f.start:f.end]
+			if strings.TrimSpace(v) != "" && v[0] == ' ' {
+				t.Errorf("%s: %s field is not left justified: %q", id, f.name, v)
+			}
+		}
+	}
+}
+
+// Every variable in the 64-character area is terminated by "&", and the count
+// field holds the number of populated slots.
+func TestSAPSALVariableArea(t *testing.T) {
+	for _, c := range Controls() {
+		if c.Source != core.SourceSAP {
+			continue
+		}
+		body := bodyOf(t, c.ID)
+		if len(body) != 200 {
+			t.Fatalf("%s produced a %d character record", c.ID, len(body))
+		}
+		vars := strings.TrimRight(body[116:180], " ")
+		if vars == "" {
+			if body[115:116] != "0" {
+				t.Errorf("%s: no variables but count field is %q", c.ID, body[115:116])
+			}
+			continue
+		}
+		if !strings.HasSuffix(vars, "&") {
+			t.Errorf("%s: variable area %q does not end in \"&\"", c.ID, vars)
+		}
+		populated := 0
+		for _, v := range strings.Split(strings.TrimSuffix(vars, "&"), "&") {
+			if v != "" {
+				populated++
+			}
+		}
+		if got, want := body[115:116], strconv.Itoa(populated); got != want {
+			t.Errorf("%s: count field is %q but %d variables are populated", c.ID, got, populated)
+		}
+	}
+}
+
+// A control that generates a value twice instead of once produces two different
+// values, which is the commonest bug in this catalog. Where a SAL record repeats
+// a value in two places, the two have to agree.
+func TestSAPRepeatedValuesAgree(t *testing.T) {
+	for i := 0; i < 50; i++ {
+		// AU3 carries the transaction code in both the record field and in
+		// variable A; AUW does the same with the program name.
+		au3 := bodyOf(t, "sap-au3-sensitive-transaction")
+		if tcode, varA := strings.TrimSpace(au3[52:72]), strings.TrimSpace(strings.Split(au3[116:180], "&")[0]); tcode != varA {
+			t.Fatalf("AU3 transaction field %q does not match variable A %q", tcode, varA)
+		}
+		auw := bodyOf(t, "sap-auw-sensitive-report")
+		if prog, varA := strings.TrimSpace(auw[72:112]), strings.TrimSpace(strings.Split(auw[116:180], "&")[0]); prog != varA {
+			t.Fatalf("AUW program field %q does not match variable A %q", prog, varA)
+		}
+		// AUM carries the client in the client field and in variable A, and the
+		// user in the user field and in variable B.
+		aum := bodyOf(t, "sap-aum-user-locked")
+		v := strings.Split(aum[116:180], "&")
+		if client := aum[112:115]; client != v[0] {
+			t.Fatalf("AUM client field %q does not match variable A %q", client, v[0])
+		}
+		if user := strings.TrimSpace(aum[40:52]); user != v[1] {
+			t.Fatalf("AUM user field %q does not match variable B %q", user, v[1])
+		}
+	}
+}

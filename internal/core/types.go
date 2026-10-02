@@ -26,7 +26,13 @@ type Env struct {
 	WebHost   string `json:"webHost"`   // web-prod01
 	DBHost    string `json:"dbHost"`    // oracle-db01
 	DBName    string `json:"dbName"`    // ORCL  (Oracle SID / service name)
+	SAPHost   string `json:"sapHost"`   // sap-prd01 (ABAP application server)
 	Subnet    string `json:"subnet"`    // 10.20.30  (first three octets)
+
+	// Virtualisation. vCenter and the ESXi hosts it manages both forward
+	// syslog, and a record names the other one, so they travel together.
+	VCHost  string `json:"vcHost"`  // vcsa01
+	ESXHost string `json:"esxHost"` // esxi01
 
 	// Network appliances. Several vendors put a serial or device id in every
 	// record, and firewall rules are written between named interfaces.
@@ -34,6 +40,16 @@ type Env struct {
 	FWSerial string `json:"fwSerial"` // 0123A45678901234
 	IntIface string `json:"intIface"` // inside
 	ExtIface string `json:"extIface"` // outside
+
+	// Routers and switches. Huawei VRP records name the device in the log line
+	// itself, so a switch or router hostname is part of the estate rather than
+	// something a control invents.
+	WAFHost string `json:"wafHost"` // waf-edge01  (Barracuda WAF unit name)
+
+	// Switching and routing. Comware, VRP and IOS style sources all name a
+	// device that is not the firewall.
+	SwitchHost string `json:"switchHost"` // sw-core01
+	RouterHost string `json:"routerHost"` // rtr-edge01
 }
 
 // DefaultEnv is the estate a fresh install starts with.
@@ -47,11 +63,18 @@ func DefaultEnv() Env {
 		WebHost:   "web-prod01",
 		DBHost:    "oracle-db01",
 		DBName:    "ORCL",
+		SAPHost:   "sap-prd01",
 		Subnet:    "10.20.30",
+		VCHost:    "vcsa01",
+		ESXHost:   "esxi01",
 		FWHost:    "fw-edge01",
 		FWSerial:  "0123A45678901234",
 		IntIface:  "inside",
 		ExtIface:  "outside",
+		WAFHost:   "waf-edge01",
+
+		SwitchHost: "sw-core01",
+		RouterHost: "rtr-edge01",
 	}
 }
 
@@ -82,8 +105,17 @@ func (e Env) Normalize() Env {
 	if strings.TrimSpace(e.DBName) == "" {
 		e.DBName = d.DBName
 	}
+	if strings.TrimSpace(e.SAPHost) == "" {
+		e.SAPHost = d.SAPHost
+	}
 	if strings.TrimSpace(e.Subnet) == "" {
 		e.Subnet = d.Subnet
+	}
+	if strings.TrimSpace(e.VCHost) == "" {
+		e.VCHost = d.VCHost
+	}
+	if strings.TrimSpace(e.ESXHost) == "" {
+		e.ESXHost = d.ESXHost
 	}
 	if strings.TrimSpace(e.FWHost) == "" {
 		e.FWHost = d.FWHost
@@ -96,6 +128,15 @@ func (e Env) Normalize() Env {
 	}
 	if strings.TrimSpace(e.ExtIface) == "" {
 		e.ExtIface = d.ExtIface
+	}
+	if strings.TrimSpace(e.WAFHost) == "" {
+		e.WAFHost = d.WAFHost
+	}
+	if strings.TrimSpace(e.SwitchHost) == "" {
+		e.SwitchHost = d.SwitchHost
+	}
+	if strings.TrimSpace(e.RouterHost) == "" {
+		e.RouterHost = d.RouterHost
 	}
 	e.NetBIOS = strings.ToUpper(e.NetBIOS)
 	e.DBName = strings.ToUpper(strings.TrimSpace(e.DBName))
@@ -264,9 +305,27 @@ const (
 	SourceTrendVision = "trendmicro"
 	SourceCrowdStrike = "crowdstrike"
 	SourceSentinelOne = "sentinelone"
+	SourceHuawei      = "huawei"
+
+	// Email security gateways.
+	SourceBarracudaESG = "barracuda-esg"
+
+	// Network infrastructure: H3C SecPath firewalls, routers and switches,
+	// which all run Comware and share one syslog format.
+	SourceH3C     = "h3c"
+	SourcePfSense = "pfsense"
+
+	// Virtualisation.
+	SourceVCenter = "vcenter"
 
 	// Cloud platforms.
 	SourceAWSCloudTrail = "aws-cloudtrail"
+
+	// Business applications.
+	SourceSAP = "sap"
+
+	// Web application firewalls.
+	SourceBarracudaWAF = "barracuda-waf"
 )
 
 // Severity labels used for colour coding in the UI.

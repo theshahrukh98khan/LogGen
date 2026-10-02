@@ -89,10 +89,24 @@ func sourceRank(s string) int {
 		return 13
 	case core.SourceSentinelOne:
 		return 14
-	case core.SourceAWSCloudTrail:
+	case core.SourcePfSense:
 		return 15
-	default:
+	case core.SourceH3C:
+		return 16
+	case core.SourceHuawei:
+		return 17
+	case core.SourceAWSCloudTrail:
+		return 18
+	case core.SourceBarracudaESG:
+		return 19
+	case core.SourceBarracudaWAF:
+		return 20
+	case core.SourceVCenter:
 		return 21
+	case core.SourceSAP:
+		return 22
+	default:
+		return 23
 	}
 }
 

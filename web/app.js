@@ -268,7 +268,14 @@ const SOURCE_LABELS = {
   trendmicro: 'Trend Micro',
   crowdstrike: 'CrowdStrike Falcon',
   sentinelone: 'SentinelOne',
+  huawei: 'Huawei VRP',
+  h3c: 'H3C Comware',
+  pfsense: 'pfSense',
+  vcenter: 'VMware vCenter',
   'aws-cloudtrail': 'AWS CloudTrail',
+  sap: 'SAP',
+  'barracuda-waf': 'Barracuda WAF',
+  'barracuda-esg': 'Barracuda Email Security Gateway',
   diagnostics: 'Diagnostics',
 };
 
@@ -726,9 +733,15 @@ function fillEnvForm() {
   $('ev_webhost').value = state.env.webHost || '';
   $('ev_dbhost').value = state.env.dbHost || '';
   $('ev_dbname').value = state.env.dbName || '';
+  $('ev_saphost').value = state.env.sapHost || '';
   $('ev_subnet').value = state.env.subnet || '';
+  $('ev_vchost').value = state.env.vcHost || '';
+  $('ev_esxhost').value = state.env.esxHost || '';
   $('ev_fwhost').value = state.env.fwHost || '';
   $('ev_fwserial').value = state.env.fwSerial || '';
+  $('ev_wafhost').value = state.env.wafHost || '';
+  $('ev_switchhost').value = state.env.switchHost || '';
+  $('ev_routerhost').value = state.env.routerHost || '';
   $('ev_intiface').value = state.env.intIface || '';
   $('ev_extiface').value = state.env.extIface || '';
   markClean('envForm');
@@ -952,9 +965,15 @@ $('envForm').onsubmit = async (e) => {
       webHost: $('ev_webhost').value,
       dbHost: $('ev_dbhost').value,
       dbName: $('ev_dbname').value,
+      sapHost: $('ev_saphost').value,
       subnet: $('ev_subnet').value,
+      vcHost: $('ev_vchost').value,
+      esxHost: $('ev_esxhost').value,
       fwHost: $('ev_fwhost').value,
       fwSerial: $('ev_fwserial').value,
+      wafHost: $('ev_wafhost').value,
+      switchHost: $('ev_switchhost').value,
+      routerHost: $('ev_routerhost').value,
       intIface: $('ev_intiface').value,
       extIface: $('ev_extiface').value,
     });
